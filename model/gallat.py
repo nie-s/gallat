@@ -3,10 +3,10 @@ import torch.nn as nn
 from torch.nn import init
 
 
-class GALLAT(nn.Module):
+class gallat(nn.Module):
 
     def __init__(self, enc1, enc2, rnn, m_size, embed_dim):
-        super(GALLAT, self).__init__()
+        super(gallat, self).__init__()
         self.enc1 = enc1
         self.enc2 = enc2
         self.rnn = rnn

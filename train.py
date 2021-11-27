@@ -6,12 +6,14 @@ from collections import defaultdict
 import torch
 import numpy as np
 
-from utils.utils import getGraph
+from model.spatial import spatial_attention
+from model.temporal import temporal_attention
+from utils.utils import get_graph, load_geo_neighbors, load_OD_matrix
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', type=str, help='dataset to choose', default='ny')
-    parser.add_argument('--batch-size', type=int, default=20, help='The batch size (defaults to 20)')
+    parser.add_argument('--batch_size', type=int, default=20, help='The batch size (defaults to 20)')
     parser.add_argument('--epochs', type=int, default=200, help='The number of epochs')
     parser.add_argument('--loss-weight', type=float, default=0.8, help='The value of loss_d')
     parser.add_argument('--gpu', type=int, help='gpu to use', default=0)
@@ -34,6 +36,7 @@ if __name__ == '__main__':
     geo_thr = 3
 
     device = 'cuda:' + str(args.gpu)
+    batch_size = args.batch_size
     model_name = args.model_name
     model_no = args.model_no
     random_seed = args.random_seed
@@ -43,20 +46,24 @@ if __name__ == '__main__':
     torch.cuda.manual_seed_all(random_seed)
 
     print('Loading data... ', end='')
-    if args.dataset == 'ny':  # TODO data_path
-        data_path = 'ny'
+    if args.dataset == 'ny':
+        data_path = '/home/zengjy/data/Manhattan'
     else:
-        data_path = 'bj'
+        data_path = '/home/zengjy/data/Beijing/'
 
     data = np.load(data_path + 'all.npy')
-    graph = getGraph(data_path + 'graph.npy')
+    graph = get_graph(data_path + 'graph.npy')
+    geo_neighbors = load_geo_neighbors(graph, m_size, geo_thr)
+    batches = random.sample(range(12, 44), batch_size)
 
-    geo_neighbors = defaultdict(dict)
+    batch_nodes = list(range(m_size))
+    feature_dim = m_size * 2 + 2
+    embed_dim = 16
 
-    for grid_no in range(0, m_size):
-        gn_grid = {}
-        for j in range(0, m_size):
-            if grid_no != j and graph[grid_no, j] < geo_thr:
-                gn_grid[j] = graph[grid_no, j]
-        geo_neighbors[grid_no] = gn_grid
+    enc1 = spatial_attention(feature_dim, embed_dim, geo_neighbors)
 
+    #########################
+    feat_data, feat_out = load_OD_matrix(data, 0, batches)
+
+    feat_out = torch.FloatTensor(feat_out).to(device=device)
+    feat_data = torch.FloatTensor(feat_data).to(device=device)
