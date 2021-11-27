@@ -47,7 +47,7 @@ if __name__ == '__main__':
     # data path
     print('Loading data... ', end='')
     if args.dataset == 'ny':
-        data_path = '/home/zengjy/data/Manhattan'
+        data_path = '/home/zengjy/data/Manhattan/'
     else:
         data_path = '/home/zengjy/data/Beijing/'
 
