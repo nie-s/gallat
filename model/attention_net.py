@@ -20,8 +20,10 @@ class attention_net(nn.Module):
         self.leakyRelu = nn.LeakyReLU(self.alpha)
 
     def forward(self, v_i, v_j, adj):
-        h_i = torch.mm(self.W, np.array(v_i).T)
-        h_j = torch.mm(self.W, np.array(v_j).T)
+        # v : 1 x d
+        # w : de x d
+        h_i = torch.mm(self.W, torch.tensor(v_i).T)  # de x 1
+        h_j = torch.mm(self.W, torch.tensor(v_j).T)
         N = h_i.size()[0]
 
         a_input = torch.cat([h_i.repeat(1, N).view(N * N, -1), h_j.repeat(N, 1)], dim=1) \

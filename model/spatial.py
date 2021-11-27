@@ -18,7 +18,7 @@ class spatial_attention(nn.Module):
         self.embed_dim = embed_dim
         self.geo_neighbors = geo_neighbors
         self.weight = nn.Parameter(
-            torch.FloatTensor(embed_dim, feature_dim))
+            torch.zeros(size=(embed_dim, feature_dim)))
         init.xavier_uniform_(self.weight)
 
     def forward(self, features, feat_out, nodes):
