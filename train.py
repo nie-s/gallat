@@ -2,13 +2,16 @@ import argparse
 import sys
 import random
 from collections import defaultdict
+from datetime import datetime
 
 import torch
 import numpy as np
+import os
 
 from model.spatial import spatial_attention
 from model.temporal import temporal_attention
-from utils.utils import get_graph, load_geo_neighbors, load_OD_matrix
+from model.gallat import gallat
+from utils.utils import get_graph, load_geo_neighbors, load_OD_matrix, name_with_datetime
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
@@ -19,9 +22,6 @@ if __name__ == '__main__':
     parser.add_argument('--gpu', type=int, help='gpu to use', default=0)
     parser.add_argument('--lr', type=float, default=0.0001, help='learning_rate')
     parser.add_argument('--random_seed', type=int, default=0, help='random seed')
-
-    parser.add_argument('--model_no', type=int)
-    parser.add_argument('--model_name', type=str, default='test')
 
     try:
         args = parser.parse_args()
@@ -37,14 +37,14 @@ if __name__ == '__main__':
 
     device = 'cuda:' + str(args.gpu)
     batch_size = args.batch_size
-    model_name = args.model_name
-    model_no = args.model_no
     random_seed = args.random_seed
     learning_rate = args.lr
+    epochs = args.epochs
 
     random.seed(random_seed)  # 设置随机数种子
     torch.cuda.manual_seed_all(random_seed)
 
+    # data path
     print('Loading data... ', end='')
     if args.dataset == 'ny':
         data_path = '/home/zengjy/data/Manhattan'
@@ -61,9 +61,7 @@ if __name__ == '__main__':
     embed_dim = 16
 
     enc1 = spatial_attention(feature_dim, embed_dim, geo_neighbors)
+    gallat = gallat()
+    gallat.fit()
 
-    #########################
-    feat_data, feat_out = load_OD_matrix(data, 0, batches)
-
-    feat_out = torch.FloatTensor(feat_out).to(device=device)
-    feat_data = torch.FloatTensor(feat_data).to(device=device)
+    print("Finished.")

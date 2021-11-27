@@ -1,4 +1,6 @@
+import math
 from collections import defaultdict
+from datetime import datetime
 
 import numpy as np
 
@@ -60,3 +62,52 @@ def load_OD_matrix(array, day, hours):
     feat_data_all = np.concatenate(feat_data_list, axis=0)
     feat_out_all = np.concatenate(feat_out_list, axis=0)
     return feat_data_all, feat_out_all
+
+
+def MAE(pred, gt):
+    all_loss = abs(pred - gt)
+    all_loss = all_loss.sum(axis=2).sum(axis=1).sum(axis=0)
+    all_loss = all_loss / pred.shape[2] / pred.shape[1] / pred.shape[0]
+    return all_loss
+
+
+def RMSE(pred, gt):
+    all_loss = abs(pred - gt) ** 2
+    all_loss = all_loss.sum(axis=2).sum(axis=1).sum(axis=0)
+    all_loss = all_loss / pred.shape[2] / pred.shape[1] / pred.shape[0]
+
+    return math.sqrt(all_loss)
+
+
+def SMAPE(pred, gt):
+    count = gt.shape[2] * gt.shape[1] * gt.shape[0]
+    all_loss = 2 * abs(pred - gt) / (abs(pred) + abs(gt) + 1)
+    all_loss = all_loss.sum(axis=(0, 1, 2))
+    all_loss = all_loss / count
+    return all_loss
+
+
+def MAPE(pred, gt):
+    count = gt.shape[2] * gt.shape[1] * gt.shape[0]
+    all_loss = abs(pred - gt) / (abs(gt) + 1)
+    all_loss = all_loss.sum(axis=(0, 1, 2))
+    all_loss = all_loss / count
+    return all_loss
+
+
+def PCC(pred, gt):
+    pred_s = pred.reshape(pred.shape[2] * pred.shape[1] * pred.shape[0])
+    gt_s = gt.reshape(gt.shape[2] * gt.shape[1] * gt.shape[0])
+    pccs = np.corrcoef(pred_s, gt_s)
+    return pccs[0][1]
+
+
+def name_with_datetime(prefix='default'):
+    now = datetime.now()
+    return prefix + '_' + now.strftime("%Y%m%d_%H%M%S")
+
+
+def analysis_result(result, ground):
+    print(MAE(result, ground), 'RMSE', RMSE(result, ground), 'PCC', PCC(result, ground), 'SMAPE', SMAPE(result, ground))
+    return ',' + str(MAE(result, ground)) + ',' + str(RMSE(result, ground)) + ',' + \
+           str(PCC(result, ground)) + ',' + str(SMAPE(result, ground))
