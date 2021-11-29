@@ -5,35 +5,34 @@ import torch.nn.functional as F
 
 
 class attention_net(nn.Module):
-    def __init__(self, feature_in, feature_out, alpha, geo_neighbors, forward_neighbors, backward_neighbors):
+    def __init__(self, feature_in, feature_out, alpha):
         super(attention_net, self).__init__()
 
-        self.feature_in = feature_in
-        self.feature_out = feature_out
+        self.feature_in = feature_in  # d
+        self.feature_out = feature_out  # de
         self.alpha = alpha
-        self.geo_neighbors = geo_neighbors
 
-        self.W = nn.Parameter(torch.zeros(size=(feature_in, feature_out)))
+        self.W = nn.Parameter(torch.zeros(size=(feature_out, feature_in)))
         nn.init.xavier_uniform_(self.W.data, gain=1.414)
-        self.a = nn.Parameter(torch.zeros(size=(2 * feature_in, 1)))
+        self.a = nn.Parameter(torch.zeros(size=(2 * feature_out, 1)))
         nn.init.xavier_uniform_(self.a.data, gain=1.414)
         self.leakyRelu = nn.LeakyReLU(self.alpha)
 
     def forward(self, v_i, v_j, adj):
-        # v : 1 x d
+        # v : N x d
         # w : de x d
-        h_i = torch.mm(self.W, torch.tensor(v_i).T)  # de x 1
-        h_j = torch.mm(self.W, torch.tensor(v_j).T)
+        h_i = torch.mm(torch.tensor(v_i, dtype=torch.float32), self.W.T)  # N x de
+        h_j = torch.mm(torch.tensor(v_j, dtype=torch.float32), self.W.T)  # N x de
+
         N = h_i.size()[0]
 
         a_input = torch.cat([h_i.repeat(1, N).view(N * N, -1), h_j.repeat(N, 1)], dim=1) \
-            .view(N, -1, 2 * self.feature_out)
+            .view(N, -1, 2 * self.feature_out)  # N x N x 2de
 
-        e = self.leakyrelu(torch.matmul(a_input, self.a).squeeze(2))
-
+        e = self.leakyRelu(torch.matmul(a_input, self.a).squeeze(2))  # N x N
         zero_vec = -9e15 * torch.ones_like(e)
 
-        attention = torch.where(adj > 0, e, zero_vec)
-        attention = F.softmax(attention, dim=1)
+        attention = torch.where(torch.tensor(adj) > 0, e, zero_vec)
+        attention = F.softmax(attention, dim=0)
 
         return attention

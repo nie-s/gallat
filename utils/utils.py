@@ -3,10 +3,28 @@ from collections import defaultdict
 from datetime import datetime
 
 import numpy as np
+import torch
+from torch.autograd import Variable
 
 
 def get_graph(graph_path):
     return np.load(graph_path)
+
+
+def get_graph_from_distance(data_path, k):
+    distance = np.load(data_path)
+    graph = np.zeros([distance.shape[0], distance.shape[1]])
+    median = np.median(distance)
+    for i in range(distance.shape[0]):
+        for j in range(distance.shape[1]):
+            if i == j:
+                graph[i, j] = 0
+            else:
+                fen = int(distance[i, j] / (median / k - 1)) + 1
+                if fen > k:
+                    fen = k
+                graph[i, j] = fen
+    return graph
 
 
 def load_geo_neighbors(graph, m_size, geo_thr):
@@ -16,34 +34,39 @@ def load_geo_neighbors(graph, m_size, geo_thr):
         gn_grid = {}
         for j in range(0, m_size):
             if grid_no != j and graph[grid_no, j] < geo_thr:
-                gn_grid[j] = graph[grid_no, j]
+                gn_grid[j] = 1 / graph[grid_no, j]
+
         geo_neighbors[grid_no] = gn_grid
 
     return geo_neighbors
 
 
-def load_forward_neighbors(feat_out, m_size):
+def load_forward_neighbors(feat_out, m_size, batch_num):
+    graph = np.zeros([m_size, m_size])
     forward_neighbors = defaultdict(dict)
     for grid_no in range(0, m_size):
         gn_grid = {}
         for j in range(0, m_size):
-            if grid_no != j and feat_out[grid_no, j] > 0:
-                gn_grid[j] = feat_out[grid_no, j]
-        forward_neighbors[grid_no] = gn_grid
+            if grid_no != j and feat_out[batch_num, grid_no, j] > 0:
+                graph[grid_no, j] = feat_out[batch_num, grid_no, j]
+                gn_grid[grid_no] = feat_out[batch_num, grid_no, j]
+            forward_neighbors[grid_no] = gn_grid
 
-    return forward_neighbors
+    return graph, forward_neighbors
 
 
-def load_backward_neighbors(feat_out, m_size):
+def load_backward_neighbors(feat_out, m_size, batch_num):
+    graph = np.zeros([m_size, m_size])
     backward_neighbors = defaultdict(dict)
     for grid_no in range(0, m_size):
         gn_grid = {}
         for j in range(0, m_size):
-            if grid_no != j and feat_out[j, grid_no] > 0:
-                gn_grid[j] = feat_out[grid_no, j]
+            if grid_no != j and feat_out[batch_num, j, grid_no] > 0:
+                graph[j, grid_no] = feat_out[batch_num, j, grid_no]
+                gn_grid[j] = feat_out[batch_num, j, grid_no]
         backward_neighbors[grid_no] = gn_grid
 
-    return backward_neighbors
+    return graph, backward_neighbors
 
 
 def load_OD_matrix(array, day, hours):
@@ -111,3 +134,49 @@ def analysis_result(result, ground):
     print(MAE(result, ground), 'RMSE', RMSE(result, ground), 'PCC', PCC(result, ground), 'SMAPE', SMAPE(result, ground))
     return ',' + str(MAE(result, ground)) + ',' + str(RMSE(result, ground)) + ',' + \
            str(PCC(result, ground)) + ',' + str(SMAPE(result, ground))
+
+
+def pre_weight(neighbor, nodes):
+    mask = Variable(torch.zeros(len(neighbor), len(nodes)))
+    for i in range(len(nodes)):
+        grid_no = i
+        neighs = neighbor[i]
+        for neigh in neighs.keys():
+            mask[grid_no, neigh] = neighs[neigh]
+    num_neigh1 = mask.sum(1, keepdim=True) + 0.00001
+    mask = mask.div(num_neigh1)
+    return mask
+
+
+def get_mask_matrix_i(weights, nnode):
+    # C=torch.cat((A,B),0)
+    matrixes = Variable(torch.zeros(1))
+    start = True
+    zero_vec = -9e15 * torch.ones_like(weights)
+    for i in range(nnode):
+        tmp = Variable(torch.zeros(len(weights), len(weights)))
+        for j in range(nnode):
+            tmp[i][j] = 1
+        if start:
+            matrixes = torch.where(tmp > 0, weights, zero_vec)
+            start = False
+        else:
+            matrixes = torch.cat((matrixes, torch.where(tmp > 0, weights, zero_vec)), 0)
+    return matrixes
+
+
+def get_mask_matrix_j(weights, nnode):
+    # C=torch.cat((A,B),0)
+    matrixes = Variable(torch.zeros(1))
+    start = True
+    zero_vec = -9e15 * torch.ones_like(weights)
+    for i in range(nnode):
+        tmp = Variable(torch.zeros(len(weights), len(weights)))
+        for j in range(nnode):
+            tmp[j][i] = 1
+        if start:
+            matrixes = torch.where(tmp > 0, weights, zero_vec)
+            start = False
+        else:
+            matrixes = torch.cat((matrixes, torch.where(tmp > 0, weights, zero_vec)), 0)
+    return matrixes
