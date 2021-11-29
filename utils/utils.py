@@ -41,29 +41,29 @@ def load_geo_neighbors(graph, m_size, geo_thr):
     return geo_neighbors
 
 
-def load_forward_neighbors(feat_out, m_size, batch_num):
+def load_forward_neighbors(feat_out, m_size):
     graph = np.zeros([m_size, m_size])
     forward_neighbors = defaultdict(dict)
     for grid_no in range(0, m_size):
         gn_grid = {}
         for j in range(0, m_size):
-            if grid_no != j and feat_out[batch_num, grid_no, j] > 0:
-                graph[grid_no, j] = feat_out[batch_num, grid_no, j]
-                gn_grid[grid_no] = feat_out[batch_num, grid_no, j]
+            if grid_no != j and feat_out[grid_no, j] > 0:
+                graph[grid_no, j] = feat_out[grid_no, j]
+                gn_grid[grid_no] = feat_out[grid_no, j]
             forward_neighbors[grid_no] = gn_grid
 
     return graph, forward_neighbors
 
 
-def load_backward_neighbors(feat_out, m_size, batch_num):
+def load_backward_neighbors(feat_out, m_size):
     graph = np.zeros([m_size, m_size])
     backward_neighbors = defaultdict(dict)
     for grid_no in range(0, m_size):
         gn_grid = {}
         for j in range(0, m_size):
-            if grid_no != j and feat_out[batch_num, j, grid_no] > 0:
-                graph[j, grid_no] = feat_out[batch_num, j, grid_no]
-                gn_grid[j] = feat_out[batch_num, j, grid_no]
+            if grid_no != j and feat_out[j, grid_no] > 0:
+                graph[j, grid_no] = feat_out[j, grid_no]
+                gn_grid[j] = feat_out[j, grid_no]
         backward_neighbors[grid_no] = gn_grid
 
     return graph, backward_neighbors
@@ -136,47 +136,35 @@ def analysis_result(result, ground):
            str(PCC(result, ground)) + ',' + str(SMAPE(result, ground))
 
 
-def pre_weight(neighbor, nodes):
-    mask = Variable(torch.zeros(len(neighbor), len(nodes)))
-    for i in range(len(nodes)):
+def pre_weight(neighbor, nnode):
+    mask = Variable(torch.zeros(len(neighbor), nnode))
+    for i in range(nnode):
         grid_no = i
         neighs = neighbor[i]
         for neigh in neighs.keys():
             mask[grid_no, neigh] = neighs[neigh]
+
     num_neigh1 = mask.sum(1, keepdim=True) + 0.00001
     mask = mask.div(num_neigh1)
     return mask
 
 
-def get_mask_matrix_i(weights, nnode):
-    # C=torch.cat((A,B),0)
-    matrixes = Variable(torch.zeros(1))
-    start = True
-    zero_vec = -9e15 * torch.ones_like(weights)
-    for i in range(nnode):
-        tmp = Variable(torch.zeros(len(weights), len(weights)))
-        for j in range(nnode):
-            tmp[i][j] = 1
-        if start:
-            matrixes = torch.where(tmp > 0, weights, zero_vec)
-            start = False
-        else:
-            matrixes = torch.cat((matrixes, torch.where(tmp > 0, weights, zero_vec)), 0)
-    return matrixes
+def pre_weight_geo(neighbor, nodes):
+    mask = Variable(torch.zeros(len(neighbor), len(nodes)))
+    for i in range(len(nodes)):
+        grid_no = i
+        neighs = neighbor[i]
+        for neigh in neighs.keys():
+            mask[grid_no, neigh] = 1 / neighs[neigh]
+    num_neigh1 = mask.sum(1, keepdim=True)
+    mask = mask.div(num_neigh1)
+    return mask
 
 
-def get_mask_matrix_j(weights, nnode):
-    # C=torch.cat((A,B),0)
-    matrixes = Variable(torch.zeros(1))
-    start = True
-    zero_vec = -9e15 * torch.ones_like(weights)
-    for i in range(nnode):
-        tmp = Variable(torch.zeros(len(weights), len(weights)))
-        for j in range(nnode):
-            tmp[j][i] = 1
-        if start:
-            matrixes = torch.where(tmp > 0, weights, zero_vec)
-            start = False
-        else:
-            matrixes = torch.cat((matrixes, torch.where(tmp > 0, weights, zero_vec)), 0)
-    return matrixes
+def get_mask_matrix(weights, nnode):
+    tmp = Variable(torch.zeros(len(weights), len(weights[0]), len(weights[0])))
+    for t in range(len(weights)):
+        for i in range(nnode):
+            for j in range(nnode):
+                tmp[t][i][j] = weights[t][i][j]
+    return tmp

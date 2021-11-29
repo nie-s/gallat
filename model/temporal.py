@@ -1,7 +1,9 @@
+import math
 from math import sqrt
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 
 class temporal_attention(nn.Module):
@@ -9,27 +11,59 @@ class temporal_attention(nn.Module):
     dim_k: int
     dim_v: int
 
-    def __init__(self, dim_in, dim_k, dim_v):
+    def __init__(self, feature_dim, embed_dim):
         super(temporal_attention, self).__init__()
-        self.dim_in = dim_in
-        self.dim_k = dim_k
-        self.dim_v = dim_v
-        self.linear_q = nn.Linear(dim_in, dim_k, bias=False)
-        self.linear_k = nn.Linear(dim_in, dim_k, bias=False)
-        self.linear_v = nn.Linear(dim_in, dim_v, bias=False)
-        self._norm_fact = 1 / sqrt(dim_k)
+        self.feature_dim = feature_dim
+        self.embed_dim = embed_dim
 
-    def forward(self, x):
-        # x: batch, n, dim_in
-        batch, n, dim_in = x.shape
-        assert dim_in == self.dim_in
+        self.wq_1 = nn.Parameter(torch.zeros(size=(feature_dim, embed_dim)))
+        self.wk_1 = nn.Parameter(torch.zeros(size=(embed_dim, embed_dim)))
+        self.wv_1 = nn.Parameter(torch.zeros(size=(embed_dim, embed_dim)))
 
-        q = self.linear_q(x)  # batch, n, dim_k
-        k = self.linear_k(x)  # batch, n, dim_k
-        v = self.linear_v(x)  # batch, n, dim_v
+        self.wq_2 = nn.Parameter(torch.zeros(size=(feature_dim, embed_dim)))
+        self.wk_2 = nn.Parameter(torch.zeros(size=(embed_dim, embed_dim)))
+        self.wv_2 = nn.Parameter(torch.zeros(size=(embed_dim, embed_dim)))
 
-        dist = torch.bmm(q, k.transpose(1, 2)) * self._norm_fact  # batch, n, n
-        dist = torch.softmax(dist, dim=-1)  # batch, n, n
+        self.wq_3 = nn.Parameter(torch.zeros(size=(feature_dim, embed_dim)))
+        self.wk_3 = nn.Parameter(torch.zeros(size=(embed_dim, embed_dim)))
+        self.wv_3 = nn.Parameter(torch.zeros(size=(embed_dim, embed_dim)))
 
-        att = torch.bmm(dist, v)
-        return att
+        self.wq_4 = nn.Parameter(torch.zeros(size=(feature_dim, embed_dim)))
+        self.wk_4 = nn.Parameter(torch.zeros(size=(embed_dim, embed_dim)))
+        self.wv_4 = nn.Parameter(torch.zeros(size=(embed_dim, embed_dim)))
+
+        self.wq = nn.Parameter(torch.zeros(size=(feature_dim, embed_dim)))
+        self.wk = nn.Parameter(torch.zeros(size=(embed_dim, embed_dim)))
+        self.wv = nn.Parameter(torch.zeros(size=(embed_dim, embed_dim)))
+
+    def forward(self, features, s1, s2, s3, s4):
+        ms1 = cal(features, s1, self.wq_1, self.wk_1, self.wv_1, self.embed_dim)
+        ms2 = cal(features, s2, self.wq_2, self.wk_2, self.wv_2, self.embed_dim)
+        ms3 = cal(features, s3, self.wq_3, self.wk_3, self.wv_3, self.embed_dim)
+        ms4 = cal(features, s4, self.wq_4, self.wk_4, self.wv_4, self.embed_dim)
+
+        ms = torch.zeros(size=(268, self.embed_dim))
+
+        for x in (ms1, ms2, ms3, ms4):
+            query = torch.mm(torch.tensor(features, dtype=torch.float32), self.wq)
+            key = torch.mm(x, self.wk_4)
+            value = torch.mm(x, self.wv_4)
+            kq = torch.mul(query, key)
+            kq = F.softmax(torch.div(kq, math.sqrt(self.embed_dim)))
+            ms = torch.add(ms, torch.mul(kq, value))
+
+        return ms
+
+
+def cal(features, s, wq, wk, wv, embed_dim):
+    ms = torch.zeros(size=(268, embed_dim))
+    for i in range(s.shape[0]):
+        mt = s[i]
+        query = torch.mm(torch.tensor(features, dtype=torch.float32), wq)
+        key = torch.mm(mt, wk)
+        value = torch.mm(mt, wv)
+        kq = torch.mul(query, key)
+        kq = F.softmax(torch.div(kq, math.sqrt(embed_dim)))
+        ms = torch.add(ms, torch.mul(kq, value))
+
+    return ms

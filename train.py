@@ -15,7 +15,7 @@ from utils.utils import get_graph, load_geo_neighbors, load_OD_matrix, name_with
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--dataset', type=str, help='dataset to choose', default='ny')
+    parser.add_argument('--dataset', type=str, help='dataset to choose', default='bj')
     parser.add_argument('--batch_size', type=int, default=2020, help='The batch size (defaults to 20)')
     parser.add_argument('--epochs', type=int, default=200, help='The number of epochs')
     parser.add_argument('--loss-weight', type=float, default=0.8, help='The value of loss_d')
@@ -39,6 +39,7 @@ if __name__ == '__main__':
     torch.cuda.manual_seed_all(random_seed)
 
     geo_thr = 3
+    time_slot = 7
 
     # data path
     print('Loading data... ', end='')
@@ -67,14 +68,11 @@ if __name__ == '__main__':
 
     geo_neighbors = load_geo_neighbors(graph, m_size, geo_thr)
 
-    batches = random.sample(range(12, 44), batch_size)
-
-    batch_nodes = list(range(m_size))
     feature_dim = m_size * 2 + 2
     embed_dim = 16
 
-    enc1 = spatial_attention(feature_dim, embed_dim, geo_neighbors)
-    gallat = gallat()
-    gallat.fit()
+    gallat = gallat(device, epochs, random_seed, args.lr, batch_size, m_size, feature_dim, embed_dim, batch_no,
+                    time_slot, graph)
+    gallat.fit(args.dataset, data, epochs, train_day, vali_day, test_day)
 
     print("Finished.")

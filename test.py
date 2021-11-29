@@ -13,6 +13,7 @@ from utils.utils import get_graph, load_geo_neighbors, load_OD_matrix, name_with
     load_forward_neighbors
 
 from model.spatial import spatial_attention
+from model.temporal import temporal_attention
 
 
 def pre_weight(neighbor, nodes):
@@ -28,6 +29,7 @@ def pre_weight(neighbor, nodes):
 
 
 batches = random.sample(range(12, 44), 20)
+halfHours = [hour for hour in range(12, 44)]
 
 data_path = '/home/zengjy/data/Beijing/'
 
@@ -39,16 +41,14 @@ def test_attention():
     # feat_data = 20 x 268 x 538  batch_size x m_size x d
     # feat_out = 20 x 268 x 268   batch_size x m_size x m_size
     feat_data, feat_out = load_OD_matrix(data, 0, batches)
-    forward_adj, forward_neighbors = load_forward_neighbors(feat_out, m_size=268, batch_num=0)
-    backward_adj, backward_neighbors = load_backward_neighbors(feat_out, m_size=268, batch_num=0)
+    forward_adj, forward_neighbors = load_forward_neighbors(feat_out[0], m_size=268)
+    backward_adj, backward_neighbors = load_backward_neighbors(feat_out[0], m_size=268)
     geo_neighbors = load_geo_neighbors(graph, m_size=268, geo_thr=3)
 
-    attention_forward = attention_net(538, 20, 0.2)
-    attention_backward = attention_net(538, 20, 0.2)
-    attention_geo = attention_net(538, 20, 0.2)
-
-    batch_nodes = list(range(268))
-
+    # batch_nodes = list(range(268))
+    # attention_forward = attention_net(538, 20, 0.2, 268)
+    # attention_backward = attention_net(538, 20, 0.2, 268)
+    # attention_geo = attention_net(538, 20, 0.2, 268)
     # t1 = torch.tensor(pre_weight(forward_neighbors, batch_nodes), dtype=torch.float32)
     # t2 = torch.tensor(feat_data[0], dtype=torch.float32)
     # mask_forward = torch.mm(t1, t2)
@@ -68,13 +68,42 @@ def test_attention():
     # def __init__(self, nnode, feature_dim, embed_dim, device, geo_adj, forward_adj, backward_adj,
     #              geo_neighbors, forward_neighbors, backward_neighbors):
 
-    spatial = spatial_attention(268, 538, 20, 'cuda:0', graph, forward_adj, backward_adj, geo_neighbors,
-                                forward_neighbors, backward_neighbors)
+    spatial = spatial_attention(268, 538, 20, 'cuda:0')
 
-    spatial.forward(feat_data[0])
+    spatial.forward(feat_data[0], graph, forward_adj, backward_adj, geo_neighbors,
+                    forward_neighbors, backward_neighbors)
+
+
+def test_ground_truth():
+    n = 1
+    ground_truth = Variable(torch.FloatTensor(np.array(data[n + 1, halfHours])))
+    gt_out = torch.div(ground_truth.sum(2, keepdim=True), 268)
+    gt_in = torch.div(torch.transpose(ground_truth.sum(1, keepdim=True), 1, 2), 268)
+    m = 4
+
+
+def test_cat():
+    t1 = torch.FloatTensor([[[1, 2], [5, 6]], [[1, 2], [5, 6]]])
+    t2 = torch.FloatTensor([[3, 4], [7, 8]])
+    print(t1.shape)
+    t2 = t2.unsqueeze(0)
+    print(t2.shape)
+    t3 = torch.cat([t1, t2])
+    print(t3)
+    print(t3.shape)
+
+
+def test_temporal():
+    m1 = test_attention()
+    m2 = test_attention()
+    mt = torch.cat([m1[0].unsqueeze(0), m2[0].unsqueeze(0)])
+    print(mt.shape)
+    temporal = temporal_attention(538, 80, 7)
+    feat_data, feat_out = load_OD_matrix(data, 4, halfHours)
+    temporal.forward(feat_data[0], mt)
 
 
 test_attention()
-
-history_m = defaultdict(dict)
-
+# test_ground_truth()
+# test_cat()
+# test_temporal()

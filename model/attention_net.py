@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 
 class attention_net(nn.Module):
-    def __init__(self, feature_in, feature_out, alpha):
+    def __init__(self, feature_in, feature_out, alpha, nnode):
         super(attention_net, self).__init__()
 
         self.feature_in = feature_in  # d
@@ -14,7 +14,7 @@ class attention_net(nn.Module):
 
         self.W = nn.Parameter(torch.zeros(size=(feature_out, feature_in)))
         nn.init.xavier_uniform_(self.W.data, gain=1.414)
-        self.a = nn.Parameter(torch.zeros(size=(2 * feature_out, 1)))
+        self.a = nn.Parameter(torch.zeros(size=(2 * feature_out, nnode)))
         nn.init.xavier_uniform_(self.a.data, gain=1.414)
         self.leakyRelu = nn.LeakyReLU(self.alpha)
 
@@ -26,10 +26,9 @@ class attention_net(nn.Module):
 
         N = h_i.size()[0]
 
-        a_input = torch.cat([h_i.repeat(1, N).view(N * N, -1), h_j.repeat(N, 1)], dim=1) \
-            .view(N, -1, 2 * self.feature_out)  # N x N x 2de
+        a_input = torch.cat([h_i, h_j], dim=1)  # N x 2de
 
-        e = self.leakyRelu(torch.matmul(a_input, self.a).squeeze(2))  # N x N
+        e = self.leakyRelu(torch.mm(a_input, self.a))  # batch x N x N
         zero_vec = -9e15 * torch.ones_like(e)
 
         attention = torch.where(torch.tensor(adj) > 0, e, zero_vec)
