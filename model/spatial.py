@@ -14,17 +14,17 @@ class spatial_attention(nn.Module):
     dim_k: int
     dim_v: int
 
-    def __init__(self, nnode, feature_dim, embed_dim, device):
+    def __init__(self, m_size, feature_dim, embed_dim, device):
         super(spatial_attention, self).__init__()
 
-        self.nnode = nnode
+        self.m_size = m_size
         self.feature_dim = feature_dim  # d
         self.embed_dim = embed_dim  # de
         self.device = device
 
-        self.attention_geo = attention_net(feature_dim, embed_dim, 0.2, nnode)
-        self.attention_forward = attention_net(feature_dim, embed_dim, 0.2, nnode)
-        self.attention_backward = attention_net(feature_dim, embed_dim, 0.2, nnode)
+        self.attention_geo = attention_net(feature_dim, embed_dim, 2 * embed_dim, 0.2, m_size)
+        self.attention_forward = attention_net(feature_dim, embed_dim, 2 * embed_dim, 0.2, m_size)
+        self.attention_backward = attention_net(feature_dim, embed_dim, 2 * embed_dim, 0.2, m_size)
 
         self.weight = nn.Parameter(
             torch.zeros(size=(embed_dim, feature_dim)))
@@ -34,11 +34,11 @@ class spatial_attention(nn.Module):
                 backward_neighbors):
         t = torch.tensor(features, dtype=torch.float32)
 
-        mask_forward = torch.mm(torch.tensor(pre_weight(forward_neighbors, self.nnode), dtype=torch.float32),
+        mask_forward = torch.mm(torch.tensor(pre_weight(forward_neighbors, self.m_size), dtype=torch.float32),
                                 t)
         mask_backward = torch.mm(
-            torch.tensor(pre_weight(backward_neighbors, self.nnode), dtype=torch.float32), t)
-        mask_geo = torch.mm(torch.tensor(pre_weight(geo_neighbors, self.nnode)), t)
+            torch.tensor(pre_weight(backward_neighbors, self.m_size), dtype=torch.float32), t)
+        mask_geo = torch.mm(torch.tensor(pre_weight_geo(geo_neighbors, self.m_size)), t)
 
         weight_forward = self.attention_forward.forward(features, mask_forward, forward_adj)
         weight_backward = self.attention_backward.forward(features, mask_backward, backward_adj)
@@ -48,7 +48,7 @@ class spatial_attention(nn.Module):
 
         zero_vec = -9e15 * torch.ones_like(t)
 
-        t_expand = t.clone().reshape(self.feature_dim, 1, self.nnode)
+        t_expand = t.clone().reshape(self.feature_dim, 1, self.m_size)
 
         x_forward = torch.mul(weight_forward, t_expand).sum(1)  # 不是mm
         x_forward = torch.mm(self.weight, x_forward)
@@ -57,6 +57,7 @@ class spatial_attention(nn.Module):
         x_geo = torch.mul(weight_geo, t_expand).sum(1)
         x_geo = torch.mm(self.weight, x_geo)
 
+        # aggregator
         m = torch.cat([x, x_forward, x_backward, x_geo])
 
         return m.T

@@ -5,30 +5,31 @@ import torch.nn.functional as F
 
 
 class attention_net(nn.Module):
-    def __init__(self, feature_in, feature_out, alpha, nnode):
+    def __init__(self, feature_dim, embed_dim, a_dim, alpha, m_size):
         super(attention_net, self).__init__()
 
-        self.feature_in = feature_in  # d
-        self.feature_out = feature_out  # de
+        self.feature_dim = feature_dim  # d
+        self.embed_dim = embed_dim  # de
+        self.a_dim = a_dim
         self.alpha = alpha
 
-        self.W = nn.Parameter(torch.zeros(size=(feature_out, feature_in)))
+        self.W = nn.Parameter(torch.zeros(size=(m_size, embed_dim, feature_dim)))
         nn.init.xavier_uniform_(self.W.data, gain=1.414)
-        self.a = nn.Parameter(torch.zeros(size=(2 * feature_out, nnode)))
+        self.a = nn.Parameter(torch.zeros(size=(a_dim, m_size)))  # d x N
         nn.init.xavier_uniform_(self.a.data, gain=1.414)
         self.leakyRelu = nn.LeakyReLU(self.alpha)
 
     def forward(self, v_i, v_j, adj):
-        # v : N x d
-        # w : de x d
-        h_i = torch.mm(torch.tensor(v_i, dtype=torch.float32), self.W.T)  # N x de
-        h_j = torch.mm(torch.tensor(v_j, dtype=torch.float32), self.W.T)  # N x de
-
-        N = h_i.size()[0]
+        # v : N x d                  n 4de
+        # w : N x de x d             n 4de 4de
+        v = v_i.unsqueeze(2)
+        vv = v_j.unsqueeze(2)
+        h_i = torch.matmul(self.W, torch.tensor(v, dtype=torch.float32)).squeeze()  # N x de
+        h_j = torch.matmul(self.W, torch.tensor(vv, dtype=torch.float32)).squeeze()  # N x de    n 4de
 
         a_input = torch.cat([h_i, h_j], dim=1)  # N x 2de
 
-        e = self.leakyRelu(torch.mm(a_input, self.a))  # batch x N x N
+        e = self.leakyRelu(torch.mm(self.a.T, a_input.T))  # N x N
         zero_vec = -9e15 * torch.ones_like(e)
 
         attention = torch.where(torch.tensor(adj) > 0, e, zero_vec)

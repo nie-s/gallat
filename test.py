@@ -92,18 +92,7 @@ def test_cat():
     print(t3)
     print(t3.shape)
 
-
-def test_temporal():
-    m1 = test_attention()
-    m2 = test_attention()
-    mt = torch.cat([m1[0].unsqueeze(0), m2[0].unsqueeze(0)])
-    print(mt.shape)
-    temporal = temporal_attention(538, 80, 7)
-    feat_data, feat_out = load_OD_matrix(data, 4, halfHours)
-    temporal.forward(feat_data[0], mt)
-
-
-test_attention()
+# test_attention()
 # test_ground_truth()
 # test_cat()
 # test_temporal()

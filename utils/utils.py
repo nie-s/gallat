@@ -136,9 +136,9 @@ def analysis_result(result, ground):
            str(PCC(result, ground)) + ',' + str(SMAPE(result, ground))
 
 
-def pre_weight(neighbor, nnode):
-    mask = Variable(torch.zeros(len(neighbor), nnode))
-    for i in range(nnode):
+def pre_weight(neighbor, m_size):
+    mask = Variable(torch.zeros(len(neighbor), m_size))
+    for i in range(m_size):
         grid_no = i
         neighs = neighbor[i]
         for neigh in neighs.keys():
@@ -149,9 +149,9 @@ def pre_weight(neighbor, nnode):
     return mask
 
 
-def pre_weight_geo(neighbor, nodes):
-    mask = Variable(torch.zeros(len(neighbor), len(nodes)))
-    for i in range(len(nodes)):
+def pre_weight_geo(neighbor, m_size):
+    mask = Variable(torch.zeros(len(neighbor), m_size))
+    for i in range(m_size):
         grid_no = i
         neighs = neighbor[i]
         for neigh in neighs.keys():
@@ -161,10 +161,10 @@ def pre_weight_geo(neighbor, nodes):
     return mask
 
 
-def get_mask_matrix(weights, nnode):
+def get_mask_matrix(weights, m_size):
     tmp = Variable(torch.zeros(len(weights), len(weights[0]), len(weights[0])))
     for t in range(len(weights)):
-        for i in range(nnode):
-            for j in range(nnode):
+        for i in range(m_size):
+            for j in range(m_size):
                 tmp[t][i][j] = weights[t][i][j]
     return tmp

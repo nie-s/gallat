@@ -12,13 +12,13 @@ from torch.autograd import Variable
 
 from model.spatial import spatial_attention
 from model.temporal import temporal_attention
+from model.transferring import transferring_attention
 from utils.utils import load_OD_matrix, analysis_result, load_geo_neighbors, name_with_datetime, \
     load_backward_neighbors, load_forward_neighbors
 
 
 class gallat(nn.Module):
 
-    # def __init__(self, enc1, enc2, rnn, m_size, embed_dim):
     def __init__(self, device, epochs, random_seed, lr, batch_size, m_size, feature_dim, embed_dim, batch_no, time_slot,
                  graph):
         super(gallat, self).__init__()
@@ -46,9 +46,9 @@ class gallat(nn.Module):
 
     def forward(self, features, features_1, feat_out, history_spatial_embedding, day, hour):
 
-        forward_adj, forward_neighbors = load_forward_neighbors(feat_out, m_size=268)
-        backward_adj, backward_neighbors = load_backward_neighbors(feat_out, m_size=268)
-        geo_neighbors = load_geo_neighbors(self.graph, m_size=268, geo_thr=3)
+        forward_adj, forward_neighbors = load_forward_neighbors(feat_out, m_size=self.m_size)
+        backward_adj, backward_neighbors = load_backward_neighbors(feat_out, m_size=self.m_size)
+        geo_neighbors = load_geo_neighbors(self.graph, m_size=self.m_size, geo_thr=3)
 
         spatial = spatial_attention(self.m_size, self.feature_dim, self.embed_dim, self.device)
         spatial_embedding = spatial.forward(features, self.graph, forward_adj, backward_adj, geo_neighbors,
@@ -58,10 +58,10 @@ class gallat(nn.Module):
 
         s1, s2, s3, s4 = get_history_embedding(day, hour, history_spatial_embedding, 'bj', self.time_slot)
         temporal = temporal_attention(self.feature_dim, 4 * self.embed_dim)
-        temporal.forward(features_1, s1, s2, s3, s4)
+        mt = temporal.forward(features_1, s1, s2, s3, s4)
 
-        od_matrix = 1
-        demand = 1
+        transferring = transferring_attention(self.m_size, 4 * self.embed_dim, 8 * self.embed_dim, self.device)
+        demand, od_matrix = transferring.forward(mt)
 
         return od_matrix, demand, history_spatial_embedding
 
@@ -69,7 +69,7 @@ class gallat(nn.Module):
         od_matrix, demand, spatial_embedding = self.forward(features, features_t1, feat_out, history_spatial_embeddings,
                                                             day, hour)
 
-        gt_out = torch.div(ground_truth.sum(2, keepdim=True), self.m_size)
+        gt_out = torch.div(ground_truth.sum(1, keepdim=True), self.m_size)
 
         loss_d = torch.mul(self.smooth_loss(demand, gt_out), self.wd)
         loss_o = torch.mul(self.smooth_loss(od_matrix, ground_truth), self.wo)
@@ -77,21 +77,32 @@ class gallat(nn.Module):
 
         return loss, loss_d, loss_o, od_matrix, spatial_embedding
 
-    # def vali_test(self, data, start, end, halfHours, batch_nodes):
-    #     result = []
-    #     ground = []
-    #
-    #     for day in range(start, end):
-    #         feat_data, feat_out = load_OD_matrix(data, day, halfHours)
-    #         feat_out = torch.FloatTensor(feat_out)
-    #         feat_data = torch.FloatTensor(feat_data)
-    #         _, ground_truth = load_OD_matrix(data, day + 1, halfHours)
-    #
-    #         od_matrix, _, _ = self.forward(feat_data, feat_out, batch_nodes)
-    #         result.append(od_matrix.detach().cpu().numpy())
-    #         ground.append(ground_truth)
-    #
-    #     return result, ground
+    def vali_test(self, data, start, end, halfHours, history_spatial_embeddings):
+        result = []
+        ground = []
+
+        embed = history_spatial_embeddings
+
+        for n in range(start, end):
+            feat_data, feat_out = load_OD_matrix(data, n, halfHours)
+            feat_out = torch.FloatTensor(feat_out)
+            feat_data = torch.FloatTensor(feat_data)
+
+            for m in range(30):
+                ground_truth = Variable(torch.FloatTensor(np.array(data[n, m + 1])))
+
+                od_matrix, demand, spatial_embedding = self.forward(feat_data[m], feat_data[m + 1], feat_out[m],
+                                                                    embed, n, m)
+
+                embed = spatial_embedding
+
+                result.append(od_matrix.detach().cpu().numpy())
+                ground.append(ground_truth.detach().cpu().numpy())
+
+        result = np.concatenate(result, axis=0).reshape(-1, self.m_size, self.m_size)
+        ground = np.concatenate(ground, axis=0).reshape(-1, self.m_size, self.m_size)
+
+        return result, ground, history_spatial_embeddings
 
     def fit(self, dataset, data, epochs, train_day, vali_day, test_day):
         optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr)
@@ -109,11 +120,9 @@ class gallat(nn.Module):
                  "ValiMAE, ValiRMSE, ValiPCC, ValiSMAPE, ValiMAPE"
                  "TestMAE, TestRMSE, TestPCC, TestSMAPE, TestMAPE, TotalTime, AveTime\n")
 
-        # if dataset == "bj"
-
         for epoch in range(self.epochs):
             one_time = time.time()
-            # if epoch % 100 == 0:
+
             result = []
             ground = []
             start_time = time.time()
@@ -130,27 +139,21 @@ class gallat(nn.Module):
             loss_d = torch.zeros(1)
             loss_o = torch.zeros(1)
 
-            history_spatial_embeddings = torch.FloatTensor(train_day, self.batch_no, self.m_size, 4 * self.embed_dim)
-            start = True
+            history_spatial_embeddings = torch.FloatTensor(train_day + vali_day + test_day, self.batch_no, self.m_size,
+                                                           4 * self.embed_dim)
 
             for n in range(train_day - 1):
                 feat_data, feat_out = load_OD_matrix(data, n, halfHours)
                 feat_out = torch.FloatTensor(feat_out)
                 feat_data = torch.FloatTensor(feat_data)
 
-                for m in range(31):
+                for m in range(30):
                     ground_truth = Variable(torch.FloatTensor(np.array(data[n, m + 1])))
                     optimizer.zero_grad()
                     loss_one, loss_d_one, loss_o_one, od_matrix, spatial_embedding = \
                         self.loss(feat_data[m], feat_data[m + 1], feat_out[m], ground_truth, history_spatial_embeddings,
                                   n, m)
-
-                    if start:
-                        history_spatial_embeddings = spatial_embedding.unsqueeze(0)
-                    else:
-                        history_spatial_embeddings = torch.cat(
-                            [history_spatial_embeddings, spatial_embedding.unsqueeze(0)])
-
+                    history_spatial_embeddings = spatial_embedding
                     loss += loss_one
                     loss_d += loss_d_one
                     loss_o += loss_o_one
@@ -164,44 +167,43 @@ class gallat(nn.Module):
             optimizer.step()
 
             fo.write("\n")
-            result = np.concatenate(result, axis=0).reshape(-1, 268, 268)
-            ground = np.concatenate(ground, axis=0).reshape(-1, 268, 268)
+            result = np.concatenate(result, axis=0).reshape(-1, self.m_size, self.m_size)
+            ground = np.concatenate(ground, axis=0).reshape(-1, self.m_size, self.m_size)
             fo.write(analysis_result(result, ground))
 
-            torch.save(self.enc1.state_dict(), save_path + dataset + '-' + str(epoch) + "enc1.pt")
-            torch.save(self.enc2.state_dict(), save_path + dataset + '-' + str(epoch) + "enc2.pt")
             torch.save(self.state_dict(), save_path + dataset + '-' + str(epoch) + "gallat.pt")
 
-            #  Testing Process
-            # result_vali, ground_vali = self.vali_test(data, train_day, train_day + vali_day, halfHours, batch_nodes)
-            #
-            # result_vali = np.concatenate(result, axis=0).reshape(-1, 268, 268)
-            # ground_vali = np.concatenate(ground, axis=0).reshape(-1, 268, 268)
-            # print('Vali')
-            # fo.write(analysis_result(result_vali, ground_vali))
-            #
-            # result, ground = self.vali_test(data, train_day + vali_day, train_day + vali_day + test_day, halfHours,
-            #                                 batch_nodes)
-            #
-            # result = np.concatenate(result, axis=0).reshape(-1, 268, 268)
-            # ground = np.concatenate(ground, axis=0).reshape(-1, 268, 268)
-            # np.save(save_path + dataset + '-' + str(epoch), result)
-            #
-            # print('Test')
-            # fo.write(analysis_result(result, ground))
-            # times.append(time.time() - start_time)
-            #
-            # print("Total time of training:", np.sum(times))
-            # print("Average time of training:", np.mean(times) / 100)
-            # fo.write(',' + str(np.sum(times)) + ',' + str(np.mean(times)) + '\n')
-            # print('one_epoch_time', time.time() - one_time)
+            #  Validation Process
+            result_vali, ground_vali, embedding = self.vali_test(data, train_day, train_day + vali_day, halfHours,
+                                                                 history_spatial_embeddings)
+
+            history_spatial_embeddings = embedding
+
+            print('Vali')
+            fo.write(analysis_result(result_vali, ground_vali))
+
+            # Testing Process
+            result, ground, embedding = self.vali_test(data, train_day + vali_day, train_day + vali_day + test_day,
+                                                       halfHours,
+                                                       history_spatial_embeddings)
+
+            np.save(save_path + dataset + '-' + str(epoch), result)
+
+            print('Test')
+            fo.write(analysis_result(result, ground))
+            times.append(time.time() - start_time)
+
+            print("Total time of training:", np.sum(times))
+            print("Average time of training:", np.mean(times) / 100)
+            fo.write(',' + str(np.sum(times)) + ',' + str(np.mean(times)) + '\n')
+            print('one_epoch_time', time.time() - one_time)
 
         fo.close()
 
 
 def get_history_embedding(day, hour, history, dataset, time_slot):
     day_len = min(day, time_slot)
-    hour_len = max(6, hour - time_slot + 1)
+    hour_len = max(0, hour - time_slot + 1)
 
     s1 = []
     for i in range(day_len):
@@ -219,4 +221,13 @@ def get_history_embedding(day, hour, history, dataset, time_slot):
     for i in range(hour_len, hour + 1):
         s4.append(history[day][i])
 
-    return torch.tensor(s1), torch.tensor(s2), torch.tensor(s3), torch.tensor(s4)
+    s1 = torch.tensor([item.detach().numpy() for item in s1])
+    s2 = torch.tensor([item.detach().numpy() for item in s2])
+    s3 = torch.tensor([item.detach().numpy() for item in s3])
+    s4 = torch.tensor([item.detach().numpy() for item in s4])
+
+    print(s4.shape)
+
+    # val= torch.tensor([item.cpu().detach().numpy() for item in val]).cuda()
+
+    return s1, s2, s3, s4
