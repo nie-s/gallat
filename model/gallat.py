@@ -15,6 +15,7 @@ from model.temporal import temporal_attention
 from model.transferring import transferring_attention
 from utils.utils import load_OD_matrix, analysis_result, load_geo_neighbors, name_with_datetime, \
     load_backward_neighbors, load_forward_neighbors
+from tqdm import trange
 
 
 class gallat(nn.Module):
@@ -142,24 +143,28 @@ class gallat(nn.Module):
             history_spatial_embeddings = torch.FloatTensor(train_day + vali_day + test_day, self.batch_no, self.m_size,
                                                            4 * self.embed_dim)
 
-            for n in range(train_day - 1):
-                feat_data, feat_out = load_OD_matrix(data, n, halfHours)
-                feat_out = torch.FloatTensor(feat_out)
-                feat_data = torch.FloatTensor(feat_data)
+            batch_range = trange((train_day - 1) * 30)
+            for _ in batch_range:
+                n = _ // 30
+                m = _ % 30
 
-                for m in range(30):
-                    ground_truth = Variable(torch.FloatTensor(np.array(data[n, m + 1])))
-                    optimizer.zero_grad()
-                    loss_one, loss_d_one, loss_o_one, od_matrix, spatial_embedding = \
-                        self.loss(feat_data[m], feat_data[m + 1], feat_out[m], ground_truth, history_spatial_embeddings,
-                                  n, m)
-                    history_spatial_embeddings = spatial_embedding
-                    loss += loss_one
-                    loss_d += loss_d_one
-                    loss_o += loss_o_one
+                if m == 0:
+                    feat_data, feat_out = load_OD_matrix(data, n, halfHours)
+                    feat_out = torch.FloatTensor(feat_out)
+                    feat_data = torch.FloatTensor(feat_data)
 
-                    result.append(od_matrix.detach().cpu().numpy())
-                    ground.append(ground_truth.detach().cpu().numpy())
+                ground_truth = Variable(torch.FloatTensor(np.array(data[n, m + 1])))
+                optimizer.zero_grad()
+                loss_one, loss_d_one, loss_o_one, od_matrix, spatial_embedding = \
+                    self.loss(feat_data[m], feat_data[m + 1], feat_out[m], ground_truth, history_spatial_embeddings,
+                              n, m)
+                history_spatial_embeddings = spatial_embedding
+                loss += loss_one
+                loss_d += loss_d_one
+                loss_o += loss_o_one
+
+                result.append(od_matrix.detach().cpu().numpy())
+                ground.append(ground_truth.detach().cpu().numpy())
 
             print("Loss=", loss.item(), 'Loss_d=', loss_d.item(), 'Loss_o=', loss_o.item())
             fo.write(str(loss.item()) + ',' + str(loss_d.item()) + ',' + str(loss_o.item()) + ',')
@@ -226,7 +231,7 @@ def get_history_embedding(day, hour, history, dataset, time_slot):
     s3 = torch.tensor([item.detach().numpy() for item in s3])
     s4 = torch.tensor([item.detach().numpy() for item in s4])
 
-    print(s4.shape)
+    # print(s4.shape)
 
     # val= torch.tensor([item.cpu().detach().numpy() for item in val]).cuda()
 
