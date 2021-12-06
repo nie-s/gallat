@@ -22,12 +22,12 @@ class spatial_attention(nn.Module):
         self.embed_dim = embed_dim  # de
         self.device = device
 
-        self.attention_geo = attention_net(feature_dim, embed_dim, 2 * embed_dim, 0.2, m_size)
-        self.attention_forward = attention_net(feature_dim, embed_dim, 2 * embed_dim, 0.2, m_size)
-        self.attention_backward = attention_net(feature_dim, embed_dim, 2 * embed_dim, 0.2, m_size)
+        self.attention_geo = attention_net(feature_dim, embed_dim, 2 * embed_dim, 0.2, m_size, device).to(device=device)
+        self.attention_forward = attention_net(feature_dim, embed_dim, 2 * embed_dim, 0.2, m_size, device).to(device=device)
+        self.attention_backward = attention_net(feature_dim, embed_dim, 2 * embed_dim, 0.2, m_size, device).to(device=device)
 
         self.weight = nn.Parameter(
-            torch.zeros(size=(embed_dim, feature_dim)))
+            torch.zeros(size=(embed_dim, feature_dim))).to(device=device)
         init.xavier_uniform_(self.weight)
 
     def forward(self, features, geo_adj, forward_adj, backward_adj, geo_neighbors, forward_neighbors,

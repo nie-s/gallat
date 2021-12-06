@@ -38,17 +38,16 @@ class gallat(nn.Module):
         self.epochs = epochs
         self.time_slot = time_slot
 
-        self.spatial_attention = spatial_attention(self.m_size, self.feature_dim, self.embed_dim, self.device)
-        self.temporal_attention = temporal_attention(self.feature_dim, 4 * self.embed_dim)
+        self.spatial_attention = spatial_attention(self.m_size, self.feature_dim, self.embed_dim, self.device).to(device=device)
+        self.temporal_attention = temporal_attention(self.feature_dim, 4 * self.embed_dim).to(device=device)
         self.transferring_attention = transferring_attention(self.m_size, 4 * self.embed_dim, 8 * self.embed_dim,
-                                                             self.device)
+                                                             self.device).to(device=device)
 
         # loss weight
         self.wd = 0.8
         self.wo = 0.2
         self.graph = graph
-
-        self.tran_Matrix = nn.Parameter(torch.FloatTensor(self.embed_dim, self.embed_dim))
+        self.tran_Matrix = nn.Parameter(torch.FloatTensor(self.embed_dim, self.embed_dim)).to(device=device)
 
     def forward(self, features, features_1, feat_out, history_spatial_embedding, day, hour):
 

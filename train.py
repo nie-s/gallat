@@ -20,7 +20,7 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=2020, help='The batch size (defaults to 20)')
     parser.add_argument('--epochs', type=int, default=200, help='The number of epochs')
     parser.add_argument('--loss-weight', type=float, default=0.8, help='The value of loss_d')
-    parser.add_argument('--gpu', type=int, help='gpu to use', default=0)
+    parser.add_argument('--gpu', type=int, help='gpu to use', default=1)
     parser.add_argument('--lr', type=float, default=0.0001, help='learning_rate')
     parser.add_argument('--random_seed', type=int, default=0, help='random seed')
 
@@ -77,7 +77,8 @@ if __name__ == '__main__':
     transferring = transferring_attention(m_size, 4 * embed_dim, 8 * embed_dim, device)
 
     gallat = gallat(device, epochs, random_seed, args.lr, batch_size, m_size, feature_dim, embed_dim, batch_no,
-                    time_slot, graph, spatial, temporal, transferring)
+                    time_slot, graph, spatial, temporal, transferring).to(device=device)
+
     gallat.fit(args.dataset, data, epochs, train_day, vali_day, test_day)
 
     print("Finished.")

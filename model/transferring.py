@@ -15,7 +15,7 @@ class transferring_attention(nn.Module):
         self.embed_dim = embed_dim  # de
         self.device = device
 
-        self.attention_net = attention_net(feature_dim, feature_dim, embed_dim, 0.2, m_size)
+        self.attention_net = attention_net(feature_dim, feature_dim, embed_dim, 0.2, m_size, device=device)
 
         self.wd = nn.Linear(feature_dim, 1, bias=True)
 

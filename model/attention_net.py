@@ -5,7 +5,7 @@ import torch.nn.functional as F
 
 
 class attention_net(nn.Module):
-    def __init__(self, feature_dim, embed_dim, a_dim, alpha, m_size):
+    def __init__(self, feature_dim, embed_dim, a_dim, alpha, m_size, device):
         super(attention_net, self).__init__()
 
         self.feature_dim = feature_dim  # d
@@ -13,11 +13,11 @@ class attention_net(nn.Module):
         self.a_dim = a_dim
         self.alpha = alpha
 
-        self.W = nn.Parameter(torch.zeros(size=(m_size, embed_dim, feature_dim)))
+        self.W = nn.Parameter(torch.zeros(size=(m_size, embed_dim, feature_dim))).to(device=device)
         nn.init.xavier_uniform_(self.W.data, gain=1.414)
-        self.a = nn.Parameter(torch.zeros(size=(a_dim, m_size)))  # d x N
+        self.a = nn.Parameter(torch.zeros(size=(a_dim, m_size))).to(device=device)  # d x N
         nn.init.xavier_uniform_(self.a.data, gain=1.414)
-        self.leakyRelu = nn.LeakyReLU(self.alpha)
+        self.leakyRelu = nn.LeakyReLU(self.alpha).to(device=device)
 
     def forward(self, v_i, v_j, adj):
         # v : N x d                  n 4de
