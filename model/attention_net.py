@@ -12,6 +12,7 @@ class attention_net(nn.Module):
         self.embed_dim = embed_dim  # de
         self.a_dim = a_dim
         self.alpha = alpha
+        self.device = device
 
         self.W = nn.Parameter(torch.zeros(size=(m_size, embed_dim, feature_dim))).to(device=device)
         nn.init.xavier_uniform_(self.W.data, gain=1.414)
@@ -22,17 +23,16 @@ class attention_net(nn.Module):
     def forward(self, v_i, v_j, adj):
         # v : N x d                  n 4de
         # w : N x de x d             n 4de 4de
-        v = v_i.unsqueeze(2)
-        vv = v_j.unsqueeze(2)
-        h_i = torch.matmul(self.W, torch.tensor(v, dtype=torch.float32)).squeeze()  # N x de
-        h_j = torch.matmul(self.W, torch.tensor(vv, dtype=torch.float32)).squeeze()  # N x de    n 4de
-
+        v = v_i.unsqueeze(2).to(device=self.device)
+        vv = v_j.unsqueeze(2).to(device=self.device)
+        h_i = torch.matmul(self.W, torch.tensor(v, dtype=torch.float32, device=self.device)).squeeze()  # N x de
+        h_j = torch.matmul(self.W, torch.tensor(vv, dtype=torch.float32, device=self.device)).squeeze()  # N x de
         a_input = torch.cat([h_i, h_j], dim=1)  # N x 2de
 
         e = self.leakyRelu(torch.mm(self.a.T, a_input.T))  # N x N
         zero_vec = -9e15 * torch.ones_like(e)
 
-        attention = torch.where(torch.tensor(adj) > 0, e, zero_vec)
+        attention = torch.where(torch.tensor(adj, device=self.device) > 0, e, zero_vec)
         attention = F.softmax(attention, dim=0)
 
         return attention

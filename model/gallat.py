@@ -38,10 +38,12 @@ class gallat(nn.Module):
         self.epochs = epochs
         self.time_slot = time_slot
 
-        self.spatial_attention = spatial_attention(self.m_size, self.feature_dim, self.embed_dim, self.device).to(device=device)
-        self.temporal_attention = temporal_attention(self.feature_dim, 4 * self.embed_dim).to(device=device)
+        self.spatial_attention = spatial_attention(self.m_size, self.feature_dim, self.embed_dim, self.device).to(
+            device=device)
+        self.temporal_attention = temporal_attention(self.feature_dim, 4 * self.embed_dim, self.device).to(
+            device=device)
         self.transferring_attention = transferring_attention(self.m_size, 4 * self.embed_dim, 8 * self.embed_dim,
-                                                             self.device).to(device=device)
+                                                             self.device, ).to(device=device)
 
         # loss weight
         self.wd = 0.8
@@ -75,8 +77,11 @@ class gallat(nn.Module):
 
         gt_out = torch.div(ground_truth.sum(1, keepdim=True), self.m_size)
 
-        loss_d = torch.mul(self.smooth_loss(demand, gt_out), self.wd)
-        loss_o = torch.mul(self.smooth_loss(od_matrix, ground_truth), self.wo)
+        loss_d = torch.mul(
+            self.smooth_loss(demand.to(device=self.device), gt_out.to(device=self.device)).to(device=self.device),
+            self.wd)
+        loss_o = torch.mul(self.smooth_loss(od_matrix.to(device=self.device), ground_truth.to(device=self.device)),
+                           self.wo)
         loss = loss_d + loss_o
 
         return loss, loss_d, loss_o, od_matrix, spatial_embedding
