@@ -173,6 +173,7 @@ class gallat(nn.Module):
 
                 result.append(od_matrix.detach().cpu().numpy())
                 ground.append(ground_truth.detach().cpu().numpy())
+                batch_range.set_description(f"train_loss: {loss_one};")
 
             print("Loss=", loss.item(), 'Loss_d=', loss_d.item(), 'Loss_o=', loss_o.item())
             fo.write(str(loss.item()) + ',' + str(loss_d.item()) + ',' + str(loss_o.item()) + ',')
