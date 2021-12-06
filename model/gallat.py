@@ -21,7 +21,7 @@ from tqdm import trange
 class gallat(nn.Module):
 
     def __init__(self, device, epochs, random_seed, lr, batch_size, m_size, feature_dim, embed_dim, batch_no, time_slot,
-                 graph):
+                 graph, spatial, temporal, transferring):
         super(gallat, self).__init__()
 
         self.smooth_loss = nn.SmoothL1Loss()
@@ -38,6 +38,11 @@ class gallat(nn.Module):
         self.epochs = epochs
         self.time_slot = time_slot
 
+        self.spatial_attention = spatial_attention(self.m_size, self.feature_dim, self.embed_dim, self.device)
+        self.temporal_attention = temporal_attention(self.feature_dim, 4 * self.embed_dim)
+        self.transferring_attention = transferring_attention(self.m_size, 4 * self.embed_dim, 8 * self.embed_dim,
+                                                             self.device)
+
         # loss weight
         self.wd = 0.8
         self.wo = 0.2
@@ -51,18 +56,17 @@ class gallat(nn.Module):
         backward_adj, backward_neighbors = load_backward_neighbors(feat_out, m_size=self.m_size)
         geo_neighbors = load_geo_neighbors(self.graph, m_size=self.m_size, geo_thr=3)
 
-        spatial = spatial_attention(self.m_size, self.feature_dim, self.embed_dim, self.device)
-        spatial_embedding = spatial.forward(features, self.graph, forward_adj, backward_adj, geo_neighbors,
-                                            forward_neighbors, backward_neighbors)
+        spatial_embedding = self.spatial_attention.forward(features, self.graph, forward_adj, backward_adj,
+                                                           geo_neighbors,
+                                                           forward_neighbors, backward_neighbors)
 
         history_spatial_embedding[day][hour] = spatial_embedding
 
         s1, s2, s3, s4 = get_history_embedding(day, hour, history_spatial_embedding, 'bj', self.time_slot)
-        temporal = temporal_attention(self.feature_dim, 4 * self.embed_dim)
-        mt = temporal.forward(features_1, s1, s2, s3, s4)
 
-        transferring = transferring_attention(self.m_size, 4 * self.embed_dim, 8 * self.embed_dim, self.device)
-        demand, od_matrix = transferring.forward(mt)
+        mt = self.temporal_attention.forward(features_1, s1, s2, s3, s4)
+
+        demand, od_matrix = self.transferring_attention.forward(mt)
 
         return od_matrix, demand, history_spatial_embedding
 
@@ -136,9 +140,9 @@ class gallat(nn.Module):
             # loss = torch.zeros(1, device=self.device)
             # loss_d = torch.zeros(1, device=self.device)
             # loss_o = torch.zeros(1, device=self.device)
-            loss = torch.zeros(1)
-            loss_d = torch.zeros(1)
-            loss_o = torch.zeros(1)
+            loss = torch.zeros(1, device=self.device)
+            loss_d = torch.zeros(1, device=self.device)
+            loss_o = torch.zeros(1, device=self.device)
 
             history_spatial_embeddings = torch.FloatTensor(train_day + vali_day + test_day, self.batch_no, self.m_size,
                                                            4 * self.embed_dim)

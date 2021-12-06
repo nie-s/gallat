@@ -7,9 +7,6 @@ import torch.nn.functional as F
 
 
 class temporal_attention(nn.Module):
-    dim_in: int
-    dim_k: int
-    dim_v: int
 
     def __init__(self, feature_dim, embed_dim):
         super(temporal_attention, self).__init__()

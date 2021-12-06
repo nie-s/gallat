@@ -6,9 +6,6 @@ from utils.utils import pre_weight
 
 
 class transferring_attention(nn.Module):
-    dim_in: int
-    dim_k: int
-    dim_v: int
 
     def __init__(self, m_size, feature_dim, embed_dim, device):
         super(transferring_attention, self).__init__()
@@ -25,7 +22,6 @@ class transferring_attention(nn.Module):
     def forward(self, mt):
         q = self.attention_net.forward(mt, mt, torch.ones(self.m_size, self.m_size))
         d = torch.sigmoid(self.wd(mt))
-
 
         for i in range(self.m_size):
             q[i].mul(d[i])

@@ -11,6 +11,7 @@ import os
 from model.spatial import spatial_attention
 from model.temporal import temporal_attention
 from model.gallat import gallat
+from model.transferring import transferring_attention
 from utils.utils import get_graph, load_geo_neighbors, load_OD_matrix, name_with_datetime, get_graph_from_distance
 
 if __name__ == '__main__':
@@ -71,8 +72,12 @@ if __name__ == '__main__':
     feature_dim = m_size * 2 + 2
     embed_dim = 16
 
+    spatial = spatial_attention(m_size, feature_dim, embed_dim, device)
+    temporal = temporal_attention(feature_dim, 4 * embed_dim)
+    transferring = transferring_attention(m_size, 4 * embed_dim, 8 * embed_dim, device)
+
     gallat = gallat(device, epochs, random_seed, args.lr, batch_size, m_size, feature_dim, embed_dim, batch_no,
-                    time_slot, graph)
+                    time_slot, graph, spatial, temporal, transferring)
     gallat.fit(args.dataset, data, epochs, train_day, vali_day, test_day)
 
     print("Finished.")
