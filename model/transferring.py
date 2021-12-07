@@ -19,11 +19,14 @@ class transferring_attention(nn.Module):
 
         self.wd = nn.Linear(feature_dim, 1, bias=True)
 
+        self.act = torch.nn.ReLU()
+
     def forward(self, mt):
-        q = self.attention_net.forward(mt, mt, torch.ones(self.m_size, self.m_size))
-        d = torch.sigmoid(self.wd(mt))
-
+        q = self.attention_net.forward(mt, mt, torch.ones(self.m_size, self.m_size))  # n x n
+        print(q)
+        d = self.act(self.wd(mt))  # todo 这个不应该是sigmoid 因为值不是在0-1之间的
         for i in range(self.m_size):
-            q[i].mul(d[i])
-
+            # print(q[i].shape)
+            # print(d.shape)
+            q[i] = torch.mul(q[i], d[i]) # todo 这里改了一下，有可能本身也是对的？
         return d, q

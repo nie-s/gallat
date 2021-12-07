@@ -15,6 +15,7 @@ from model.transferring import transferring_attention
 from utils.utils import get_graph, load_geo_neighbors, load_OD_matrix, name_with_datetime, get_graph_from_distance
 
 if __name__ == '__main__':
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--dataset', type=str, help='dataset to choose', default='bj')
     parser.add_argument('--batch_size', type=int, default=2020, help='The batch size (defaults to 20)')

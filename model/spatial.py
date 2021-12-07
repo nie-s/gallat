@@ -39,6 +39,7 @@ class spatial_attention(nn.Module):
         mask_forward = torch.mm(
             torch.tensor(pre_weight(forward_neighbors, self.m_size), dtype=torch.float32, device=self.device),
             t)
+        print(mask_forward.shape)
         mask_backward = torch.mm(
             torch.tensor(pre_weight(backward_neighbors, self.m_size), dtype=torch.float32, device=self.device), t)
         mask_geo = torch.mm(torch.tensor(pre_weight_geo(geo_neighbors, self.m_size), device=self.device), t)

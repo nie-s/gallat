@@ -49,8 +49,9 @@ def load_forward_neighbors(feat_out, m_size):
         for j in range(0, m_size):
             if grid_no != j and feat_out[grid_no, j] > 0:
                 graph[grid_no, j] = feat_out[grid_no, j]
-                gn_grid[grid_no] = feat_out[grid_no, j]
-            forward_neighbors[grid_no] = gn_grid
+                gn_grid[j] = feat_out[grid_no, j] #todo 这里写成了grad_no
+
+        forward_neighbors[grid_no] = gn_grid #todo 这里缩进有问题，每一个相当于只找了一个邻居
 
     return graph, forward_neighbors
 
@@ -74,6 +75,11 @@ def load_OD_matrix(array, day, hours):
     feat_data_list = []
     for hour in hours:
         feat_out = array[day, hour]
+        mylen = np.zeros([len(feat_out), len(feat_out)])
+        if (feat_out == mylen).all():
+            print("+1")
+        else:
+            print("-1")
         feat_in = feat_out.T
         feat_o = feat_out.sum(axis=1, keepdims=True)
         feat_i = feat_in.sum(axis=1, keepdims=True)

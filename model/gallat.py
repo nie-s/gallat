@@ -53,20 +53,20 @@ class gallat(nn.Module):
 
     def forward(self, features, features_1, feat_out, history_spatial_embedding, day, hour):
 
-        forward_adj, forward_neighbors = load_forward_neighbors(feat_out, m_size=self.m_size)
-        backward_adj, backward_neighbors = load_backward_neighbors(feat_out, m_size=self.m_size)
-        geo_neighbors = load_geo_neighbors(self.graph, m_size=self.m_size, geo_thr=3)
+        forward_adj, forward_neighbors = load_forward_neighbors(feat_out, m_size=self.m_size)  # check
+        backward_adj, backward_neighbors = load_backward_neighbors(feat_out, m_size=self.m_size)  # check
+        geo_neighbors = load_geo_neighbors(self.graph, m_size=self.m_size, geo_thr=3)  # check
 
         spatial_embedding = self.spatial_attention.forward(features, self.graph, forward_adj, backward_adj,
                                                            geo_neighbors,
                                                            forward_neighbors, backward_neighbors)
 
         history_spatial_embedding[day][hour] = spatial_embedding
-
+        # print(spatial_embedding)
         s1, s2, s3, s4 = get_history_embedding(day, hour, history_spatial_embedding, 'bj', self.time_slot)
-
+        # print(s4)
         mt = self.temporal_attention.forward(features_1, s1, s2, s3, s4)
-
+        # print(mt)
         demand, od_matrix = self.transferring_attention.forward(mt)
 
         return od_matrix, demand, history_spatial_embedding
@@ -138,7 +138,7 @@ class gallat(nn.Module):
 
             print("###########################################################################################")
             print("Training Process: epoch=", epoch)
-            halfHours = [hour for hour in range(12, 45)]
+            halfHours = [hour for hour in range(12, 45)]  # todo 这里后面肯定要改
             fo.write(str(epoch) + ",")
 
             # loss = torch.zeros(1, device=self.device)
@@ -150,8 +150,8 @@ class gallat(nn.Module):
 
             history_spatial_embeddings = torch.FloatTensor(train_day + vali_day + test_day, self.batch_no, self.m_size,
                                                            4 * self.embed_dim)
-
             batch_range = trange((train_day - 1) * 30)
+            print("fuckkkk")
             for _ in batch_range:
                 n = _ // 30
                 m = _ % 30
@@ -161,7 +161,7 @@ class gallat(nn.Module):
                     feat_out = torch.FloatTensor(feat_out)
                     feat_data = torch.FloatTensor(feat_data)
 
-                ground_truth = Variable(torch.FloatTensor(np.array(data[n, m + 1])))
+                ground_truth = torch.FloatTensor(np.array(data[n, m + 1 + 12]))  # todo 这里对应的不是m
                 optimizer.zero_grad()
                 loss_one, loss_d_one, loss_o_one, od_matrix, spatial_embedding = \
                     self.loss(feat_data[m], feat_data[m + 1], feat_out[m], ground_truth, history_spatial_embeddings,
@@ -170,9 +170,10 @@ class gallat(nn.Module):
                 loss += loss_one
                 loss_d += loss_d_one
                 loss_o += loss_o_one
-
                 result.append(od_matrix.detach().cpu().numpy())
                 ground.append(ground_truth.detach().cpu().numpy())
+                # print(od_matrix)
+                # print(ground_truth)
                 batch_range.set_description(f"train_loss: {loss_one};")
 
             print("Loss=", loss.item(), 'Loss_d=', loss_d.item(), 'Loss_o=', loss_o.item())
@@ -235,7 +236,7 @@ def get_history_embedding(day, hour, history, dataset, time_slot):
     for i in range(hour_len, hour + 1):
         s4.append(history[day][i])
 
-    s1 = torch.tensor([item.detach().numpy() for item in s1])
+    s1 = torch.tensor([item.detach().numpy() for item in s1]) # todo 这里其实不能detach 要保存梯度
     s2 = torch.tensor([item.detach().numpy() for item in s2])
     s3 = torch.tensor([item.detach().numpy() for item in s3])
     s4 = torch.tensor([item.detach().numpy() for item in s4])
