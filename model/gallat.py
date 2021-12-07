@@ -185,7 +185,7 @@ class gallat(nn.Module):
 
                 optimizer.zero_grad()
                 loss_one, loss_d_one, loss_o_one, od_matrix, ground_truth = self.loss(n, m)
-                print(od_matrix)
+                # print(od_matrix)
 
                 loss = loss_one
                 loss_d = loss_d_one
