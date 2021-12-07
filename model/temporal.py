@@ -31,7 +31,7 @@ class temporal_attention(nn.Module):
 
         self.wq = nn.Parameter(torch.FloatTensor(feature_dim, embed_dim).to(device=device))
         self.wk = nn.Parameter(torch.FloatTensor(embed_dim, embed_dim).to(device=device))
-        self.wv = nn.Parameter(torch.FloatTensor(embed_dim, embed_dim).to(device=device))  # todo 这些全初始化成全0可能不太行吧
+        self.wv = nn.Parameter(torch.FloatTensor(embed_dim, embed_dim).to(device=device))
 
         init.xavier_uniform_(self.wq_1)
         init.xavier_uniform_(self.wq_2)
@@ -57,9 +57,10 @@ class temporal_attention(nn.Module):
         ms3 = cal(features, s3, self.wq_3, self.wk_3, self.wv_3, self.embed_dim, self.device)
         ms4 = cal(features, s4, self.wq_4, self.wk_4, self.wv_4, self.embed_dim, self.device)
         ms = torch.zeros(size=(268, self.embed_dim), device=self.device)
+        # print(s1.shape)
 
         for x in (ms1, ms2, ms3, ms4):
-            query = torch.mm(torch.tensor(features, dtype=torch.float32, device=self.device), self.wq)
+            query = torch.mm(features, self.wq)
             key = torch.mm(x, self.wk_4)
             value = torch.mm(x, self.wv_4)
             kq = torch.mul(query, key)
@@ -76,7 +77,7 @@ def cal(features, s, wq, wk, wv, embed_dim, device):
         # print(s)
         # print(mt.shape)
         # print(wk.shape)
-        query = torch.mm(torch.tensor(features, dtype=torch.float32, device=device), wq)
+        query = torch.mm(features, wq)
         key = torch.mm(mt, wk)
         value = torch.mm(mt, wv)
         kq = torch.mul(query, key)

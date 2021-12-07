@@ -21,8 +21,15 @@ class transferring_attention(nn.Module):
 
     def forward(self, mt):
         q = self.attention_net.forward(mt, mt, torch.ones(self.m_size, self.m_size))  # n x n
-        print(q)
-        d = self.act(self.wd(mt))  # todo 这个不应该是sigmoid 因为值不是在0-1之间的
+        # print(q)
+        d = self.act(self.wd(mt))
+        # print(q)
+        # print(d)
+        q = torch.mul(q, d)
+        '''
         for i in range(self.m_size):
-            q[i] = torch.mul(q[i], d[i])  # todo 这里改了一下，有可能本身也是对的？
+            q[i] = torch.mul(q[i],
+                             d[i][0])
+        '''
+        # print(q)
         return d, q
