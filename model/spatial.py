@@ -1,12 +1,9 @@
-from math import sqrt
-
 import torch
 import torch.nn as nn
 from torch.nn import init
-import torch.nn.functional as F
 from model.attention_net import attention_net
 
-from utils.utils import pre_weight, get_mask_matrix, pre_weight_geo
+from utils.utils import pre_weight, pre_weight_geo
 
 
 class spatial_attention(nn.Module):
@@ -29,7 +26,7 @@ class spatial_attention(nn.Module):
             device=device)
 
         self.weight = nn.Parameter(
-            torch.zeros(size=(embed_dim, feature_dim))).to(device=device)
+            torch.FloatTensor(size=(embed_dim, feature_dim))).to(device=device)
         init.xavier_uniform_(self.weight)
 
     def forward(self, features, geo_adj, forward_adj, backward_adj, geo_neighbors, forward_neighbors,

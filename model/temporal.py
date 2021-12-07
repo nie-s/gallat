@@ -1,8 +1,7 @@
 import math
-from math import sqrt
-
 import torch
 import torch.nn as nn
+from torch.nn import init
 import torch.nn.functional as F
 
 
@@ -14,25 +13,43 @@ class temporal_attention(nn.Module):
         self.embed_dim = embed_dim
         self.device = device
 
-        self.wq_1 = nn.Parameter(torch.zeros(size=(feature_dim, embed_dim)))
-        self.wk_1 = nn.Parameter(torch.zeros(size=(embed_dim, embed_dim)))
-        self.wv_1 = nn.Parameter(torch.zeros(size=(embed_dim, embed_dim)))
+        self.wq_1 = nn.Parameter(torch.FloatTensor(feature_dim, embed_dim).to(device=device))
+        self.wk_1 = nn.Parameter(torch.FloatTensor(embed_dim, embed_dim).to(device=device))
+        self.wv_1 = nn.Parameter(torch.FloatTensor(embed_dim, embed_dim).to(device=device))
 
-        self.wq_2 = nn.Parameter(torch.zeros(size=(feature_dim, embed_dim)))
-        self.wk_2 = nn.Parameter(torch.zeros(size=(embed_dim, embed_dim)))
-        self.wv_2 = nn.Parameter(torch.zeros(size=(embed_dim, embed_dim)))
+        self.wq_2 = nn.Parameter(torch.FloatTensor(feature_dim, embed_dim).to(device=device))
+        self.wk_2 = nn.Parameter(torch.FloatTensor(embed_dim, embed_dim).to(device=device))
+        self.wv_2 = nn.Parameter(torch.FloatTensor(embed_dim, embed_dim).to(device=device))
 
-        self.wq_3 = nn.Parameter(torch.zeros(size=(feature_dim, embed_dim)))
-        self.wk_3 = nn.Parameter(torch.zeros(size=(embed_dim, embed_dim)))
-        self.wv_3 = nn.Parameter(torch.zeros(size=(embed_dim, embed_dim)))
+        self.wq_3 = nn.Parameter(torch.FloatTensor(feature_dim, embed_dim).to(device=device))
+        self.wk_3 = nn.Parameter(torch.FloatTensor(embed_dim, embed_dim).to(device=device))
+        self.wv_3 = nn.Parameter(torch.FloatTensor(embed_dim, embed_dim).to(device=device))
 
-        self.wq_4 = nn.Parameter(torch.zeros(size=(feature_dim, embed_dim)))
-        self.wk_4 = nn.Parameter(torch.zeros(size=(embed_dim, embed_dim)))
-        self.wv_4 = nn.Parameter(torch.zeros(size=(embed_dim, embed_dim)))
+        self.wq_4 = nn.Parameter(torch.FloatTensor(feature_dim, embed_dim).to(device=device))
+        self.wk_4 = nn.Parameter(torch.FloatTensor(embed_dim, embed_dim).to(device=device))
+        self.wv_4 = nn.Parameter(torch.FloatTensor(embed_dim, embed_dim).to(device=device))
 
-        self.wq = nn.Parameter(torch.zeros(size=(feature_dim, embed_dim)))
-        self.wk = nn.Parameter(torch.zeros(size=(embed_dim, embed_dim)))
-        self.wv = nn.Parameter(torch.zeros(size=(embed_dim, embed_dim))) # todo 这些全初始化成全0可能不太行吧
+        self.wq = nn.Parameter(torch.FloatTensor(feature_dim, embed_dim).to(device=device))
+        self.wk = nn.Parameter(torch.FloatTensor(embed_dim, embed_dim).to(device=device))
+        self.wv = nn.Parameter(torch.FloatTensor(embed_dim, embed_dim).to(device=device))  # todo 这些全初始化成全0可能不太行吧
+
+        init.xavier_uniform_(self.wq_1)
+        init.xavier_uniform_(self.wq_2)
+        init.xavier_uniform_(self.wq_3)
+        init.xavier_uniform_(self.wq_4)
+        init.xavier_uniform_(self.wq)
+
+        init.xavier_uniform_(self.wk_1)
+        init.xavier_uniform_(self.wk_2)
+        init.xavier_uniform_(self.wk_3)
+        init.xavier_uniform_(self.wk_4)
+        init.xavier_uniform_(self.wk)
+
+        init.xavier_uniform_(self.wv_1)
+        init.xavier_uniform_(self.wv_2)
+        init.xavier_uniform_(self.wv_3)
+        init.xavier_uniform_(self.wv_4)
+        init.xavier_uniform_(self.wv)
 
     def forward(self, features, s1, s2, s3, s4):
         ms1 = cal(features, s1, self.wq_1, self.wk_1, self.wv_1, self.embed_dim, self.device)
@@ -56,6 +73,9 @@ def cal(features, s, wq, wk, wv, embed_dim, device):
     ms = torch.zeros(size=(268, embed_dim), device=device)
     for i in range(s.shape[0]):
         mt = s[i].to(device=device)
+        # print(s)
+        # print(mt.shape)
+        # print(wk.shape)
         query = torch.mm(torch.tensor(features, dtype=torch.float32, device=device), wq)
         key = torch.mm(mt, wk)
         value = torch.mm(mt, wv)

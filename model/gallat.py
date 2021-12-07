@@ -1,20 +1,19 @@
 import os
 import time
 import torch
-import random
 
 import numpy as np
 import torch.nn as nn
 
 from datetime import datetime
-from torch.nn import init
 from torch.autograd import Variable
+from torch.nn import init
 
 from model.spatial import spatial_attention
 from model.temporal import temporal_attention
 from model.transferring import transferring_attention
-from utils.utils import load_OD_matrix, analysis_result, load_geo_neighbors, name_with_datetime, \
-    load_backward_neighbors, load_forward_neighbors
+from utils.utils import load_OD_matrix, analysis_result, load_geo_neighbors, load_backward_neighbors, \
+    load_forward_neighbors
 from tqdm import trange
 
 
@@ -50,6 +49,7 @@ class gallat(nn.Module):
         self.wo = 0.2
         self.graph = graph
         self.tran_Matrix = nn.Parameter(torch.FloatTensor(self.embed_dim, self.embed_dim)).to(device=device)
+        init.xavier_uniform_(self.tran_Matrix)
 
     def forward(self, features, features_1, feat_out, history_spatial_embedding, day, hour):
 
@@ -63,7 +63,7 @@ class gallat(nn.Module):
 
         history_spatial_embedding[day][hour] = spatial_embedding
         # print(spatial_embedding)
-        s1, s2, s3, s4 = get_history_embedding(day, hour, history_spatial_embedding, 'bj', self.time_slot)
+        s1, s2, s3, s4 = get_history_embedding(day, hour, history_spatial_embedding, 'bj', self.time_slot, self.device)
         # print(s4)
         mt = self.temporal_attention.forward(features_1, s1, s2, s3, s4)
         # print(mt)
@@ -216,33 +216,24 @@ class gallat(nn.Module):
         fo.close()
 
 
-def get_history_embedding(day, hour, history, dataset, time_slot):
+def get_history_embedding(day, hour, history, dataset, time_slot, device):
     day_len = min(day, time_slot)
     hour_len = max(0, hour - time_slot + 1)
 
-    s1 = []
+    s1 = torch.tensor([]).to(device=device)
     for i in range(day_len):
-        s1.append(history[day - i][hour + 1])
+        s1 = torch.cat([s1, torch.tensor(history[day - i][hour + 1].unsqueeze(0), device=device)])
 
-    s2 = []
+    s2 = torch.tensor([]).to(device=device)
     for i in range(day_len):
-        s2.append(history[day - i][hour])
+        s2 = torch.cat([s2, torch.tensor(history[day - i][hour].unsqueeze(0), device=device)])
 
-    s3 = []
+    s3 = torch.tensor([]).to(device=device)
     for i in range(day_len):
-        s3.append(history[day - i][hour + 2])
+        s3 = torch.cat([s3, torch.tensor(history[day - i][hour + 2].unsqueeze(0), device=device)])
 
-    s4 = []
+    s4 = torch.tensor([]).to(device=device)
     for i in range(hour_len, hour + 1):
-        s4.append(history[day][i])
-
-    s1 = torch.tensor([item.detach().numpy() for item in s1]) # todo 这里其实不能detach 要保存梯度
-    s2 = torch.tensor([item.detach().numpy() for item in s2])
-    s3 = torch.tensor([item.detach().numpy() for item in s3])
-    s4 = torch.tensor([item.detach().numpy() for item in s4])
-
-    # print(s4.shape)
-
-    # val= torch.tensor([item.cpu().detach().numpy() for item in val]).cuda()
+        s4 = torch.cat([s4, torch.tensor(history[day][i], device=device).unsqueeze(0)])
 
     return s1, s2, s3, s4

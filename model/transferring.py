@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
-from torch.nn import init
 from model.attention_net import attention_net
-from utils.utils import pre_weight
 
 
 class transferring_attention(nn.Module):
@@ -26,7 +24,5 @@ class transferring_attention(nn.Module):
         print(q)
         d = self.act(self.wd(mt))  # todo 这个不应该是sigmoid 因为值不是在0-1之间的
         for i in range(self.m_size):
-            # print(q[i].shape)
-            # print(d.shape)
-            q[i] = torch.mul(q[i], d[i]) # todo 这里改了一下，有可能本身也是对的？
+            q[i] = torch.mul(q[i], d[i])  # todo 这里改了一下，有可能本身也是对的？
         return d, q
