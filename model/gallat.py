@@ -60,7 +60,7 @@ class gallat(nn.Module):
         self.neighbor_list = [[0] * 100 for i in range(100)]
 
     def get_spatial_embedding(self, day, hour):
-        feat_out = self.data[day, hour]
+        feat_out = self.data[day, hour + self.start_hour]
         # print("==========")
         st = time.time()
 
@@ -92,9 +92,12 @@ class gallat(nn.Module):
         # print(time.time() - st)
         st = time.time()
         mt = self.temporal_attention.forward(self.features, s1, s2, s3, s4)
+        # print("====mt====")
+        # print(mt)
         # print(time.time() - st)
         st = time.time()
         demand, od_matrix = self.transferring_attention.forward(mt)
+        # print(od_matrix)
         # print(time.time() - st)
 
         return od_matrix, demand
@@ -103,9 +106,10 @@ class gallat(nn.Module):
         ground_truth = torch.FloatTensor(np.array(self.data[day, hour + 1 + self.start_hour]))
 
         od_matrix, demand = self.forward(day, hour)
-
+        demand = demand.squeeze(1)
         gt_out = ground_truth.sum(dim=1)
-
+        # print(demand)
+        # print(gt_out)
         loss_d = torch.mul(
             self.smooth_loss(demand.to(device=self.device), gt_out.to(device=self.device)).to(device=self.device),
             self.wd)
@@ -176,9 +180,9 @@ class gallat(nn.Module):
             print("###########################################################################################")
             print("Training Process: epoch=", epoch)
             halfHours = (end_hour - start_hour + 1)
-            fo.write(str(epoch) + ",")
+            # fo.write(str(epoch) + ",")
 
-            batch_range = trange(100, train_day * halfHours)  # todo 之前这里为啥要-1?
+            batch_range = trange(500, train_day * halfHours)  # todo 之前这里为啥要-1?
             for _ in batch_range:
                 n = _ // halfHours
                 m = _ % halfHours
@@ -199,9 +203,9 @@ class gallat(nn.Module):
                 optimizer.step()
 
             print("Loss=", loss.item(), 'Loss_d=', loss_d.item(), 'Loss_o=', loss_o.item())
-            fo.write(str(loss.item()) + ',' + str(loss_d.item()) + ',' + str(loss_o.item()) + ',')
+            # fo.write(str(loss.item()) + ',' + str(loss_d.item()) + ',' + str(loss_o.item()) + ',')
 
-            fo.write("\n")
+            # fo.write("\n")
             result = np.concatenate(result, axis=0).reshape(-1, self.m_size, self.m_size)
             ground = np.concatenate(ground, axis=0).reshape(-1, self.m_size, self.m_size)
             fo.write(analysis_result(result, ground))
@@ -254,5 +258,12 @@ class gallat(nn.Module):
         s4 = torch.tensor([]).to(device=device)
         for i in range(hour_len, hour + 1):
             s4 = torch.cat([s4, self.get_spatial_embedding(day, i)])
-
+        # print("=====s1======")
+        # print(s1)
+        # print("=====s2======")
+        # print(s2)
+        # print("=====s3======")
+        # print(s3)
+        # print("=====s4======")
+        # print(s4)
         return s1, s2, s3, s4

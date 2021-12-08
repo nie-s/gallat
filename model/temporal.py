@@ -53,20 +53,44 @@ class temporal_attention(nn.Module):
 
     def forward(self, features, s1, s2, s3, s4):
         ms1 = cal(features, s1, self.wq_1, self.wk_1, self.wv_1, self.embed_dim, self.device)
+        # print("====m1====")
+        # print(ms1)
         ms2 = cal(features, s2, self.wq_2, self.wk_2, self.wv_2, self.embed_dim, self.device)
+        # print("====m2====")
+        # print(ms2)
         ms3 = cal(features, s3, self.wq_3, self.wk_3, self.wv_3, self.embed_dim, self.device)
+        # print("====m3====")
+        # print(ms3)
         ms4 = cal(features, s4, self.wq_4, self.wk_4, self.wv_4, self.embed_dim, self.device)
+        # print("====m4====")
+        # print(ms4)
         ms = torch.zeros(size=(268, self.embed_dim), device=self.device)
         # print(s1.shape)
 
         for x in (ms1, ms2, ms3, ms4):
-            query = torch.mm(features, self.wq)
-            key = torch.mm(x, self.wk_4)
-            value = torch.mm(x, self.wv_4)
-            kq = torch.mul(query, key)
-            kq = F.softmax(torch.div(kq, math.sqrt(self.embed_dim)))
-            ms = torch.add(ms, torch.mul(kq, value))
+            # print("+1")
 
+            query = torch.mm(features, self.wq)
+            key = torch.mm(x, self.wk)  # todo 这里之前似乎写错了
+            value = torch.mm(x, self.wv)
+            # print(x)
+            # print(query)
+            # print(key)
+            # print(value)
+            # print(query.shape)
+            # print(key.shape)
+            # print(self.embed_dim)
+            kq = torch.mm(query, key.T)
+            # print(kq)
+            temp = torch.div(kq, 2 * math.sqrt(self.embed_dim))
+            # print(temp)
+            kq = F.softmax(temp, dim=1)
+            # print(kq)
+            temp2 = torch.mm(kq, value)
+            ms = torch.add(ms, temp2)
+
+        # print("====ms====")
+        # print(ms)
         return ms
 
 
@@ -74,14 +98,25 @@ def cal(features, s, wq, wk, wv, embed_dim, device):
     ms = torch.zeros(size=(268, embed_dim), device=device)
     for i in range(s.shape[0]):
         mt = s[i].to(device=device)
-        # print(s)
+        # print("=======================mt======================")
+        # print(mt)
         # print(mt.shape)
         # print(wk.shape)
         query = torch.mm(features, wq)
         key = torch.mm(mt, wk)
+        # print(query)
+        # print(key)
         value = torch.mm(mt, wv)
-        kq = torch.mul(query, key)
-        kq = F.softmax(torch.div(kq, math.sqrt(embed_dim)))
-        ms = torch.add(ms, torch.mul(kq, value))
+        # print(value)
+        kq = torch.mm(query, key.T)  # todo 这里应该还是 matmul
+        # print(kq)
+        temp = torch.div(kq, 2 * math.sqrt(embed_dim))
+        # print(temp)
+        gg = F.softmax(temp, dim=1)
+        # print(gg)
+        temp2 = torch.mm(gg, value)
+        # print(temp2)
+        ms = torch.add(ms, temp2)
+        # print(ms)
 
     return ms

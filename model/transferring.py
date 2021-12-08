@@ -25,7 +25,6 @@ class transferring_attention(nn.Module):
         # print(q)
         temp = self.wd(mt)
         d = F.relu(temp) # todo 这里好奇怪，需要单独分出一个变量 不然d全是0
-
         q = torch.mul(q, d) # 这里测试了一下，应该结果不会有问题
 
         '''

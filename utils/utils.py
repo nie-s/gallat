@@ -173,6 +173,12 @@ def pre_weight(neighbor, m_size):
 
     num_neigh1 = mask.sum(1, keepdim=True) + 0.00001
     mask = mask.div(num_neigh1)
+    '''
+    if (mask == 0).all():
+        print("no")
+    else:
+        print("yes")
+        '''
     return mask
 
 

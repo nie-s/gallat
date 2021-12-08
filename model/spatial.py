@@ -43,11 +43,16 @@ class spatial_attention(nn.Module):
             self.neighbor_list[day][hour] = [mask_forward, mask_backward, mask_geo]
         else:
             mask_forward, mask_backward, mask_geo = self.neighbor_list[day][hour]
-
+        # print(mask_forward)
+        # print(mask_backward)
+        # print((mask_geo == 0).all())
+        # print("=======")
         weight_forward = self.attention_forward.forward(features, mask_forward, forward_adj)
         weight_backward = self.attention_backward.forward(features, mask_backward, backward_adj)
         weight_geo = self.attention_geo.forward(features, mask_geo, geo_adj)
-
+        # print(weight_forward)
+        # print(weight_backward)
+        # print("=======")
         x = torch.mm(self.weight, t.T)
 
         # zero_vec = -9e15 * torch.ones_like(t, device=self.device)
@@ -63,6 +68,7 @@ class spatial_attention(nn.Module):
         x_geo = torch.mm(self.weight, x_geo)
 
         # aggregator
-        m = torch.cat([x, x_forward, x_backward, x_geo])
+
+        m = torch.cat([x_forward, x, x_geo, x_backward])  # todo 这里我改了一下顺序 为了查看变量的值
 
         return m.T
