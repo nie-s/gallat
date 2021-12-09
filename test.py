@@ -95,4 +95,5 @@ def test_cat():
 # test_attention()
 
 test_cat()
+test_cat()
 
