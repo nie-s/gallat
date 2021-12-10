@@ -21,10 +21,9 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=2020, help='The batch size (defaults to 20)')
     parser.add_argument('--epochs', type=int, default=200, help='The number of epochs')
     parser.add_argument('--loss-weight', type=float, default=0.8, help='The value of loss_d')
-    parser.add_argument('--gpu', type=int, help='gpu to use', default=2)
+    parser.add_argument('--gpu', type=int, help='gpu to use', default=5)
     parser.add_argument('--lr', type=float, default=0.0001, help='learning_rate')
     parser.add_argument('--random_seed', type=int, default=0, help='random seed')
-
     try:
         args = parser.parse_args()
     except:
@@ -32,6 +31,7 @@ if __name__ == '__main__':
         sys.exit(0)
 
     device = 'cuda:' + str(args.gpu)
+    os.environ['CUDA_LAUNCH_BLOCKING'] = "1"
     batch_size = args.batch_size
     random_seed = args.random_seed
     learning_rate = args.lr
@@ -53,7 +53,8 @@ if __name__ == '__main__':
         batch_no = 48
         start_hour = 0
         end_hour = 48
-        data_path = '/home/zengjy/data/Manhattan/'
+        data_path = "/home/hlz/maxj/data/Manhattan/"
+        # data_path = '/home/zengjy/data/Manhattan/'
         data = np.load(data_path + 'Manhattan.npy')
         graph = get_graph_from_distance(data_path + 'distance.npy', 4)
     else:
@@ -64,13 +65,14 @@ if __name__ == '__main__':
         batch_no = 32
         start_hour = 12
         end_hour = 44
-        data_path = '/home/zengjy/data/Beijing/'
+        data_path = "/home/hlz/maxj/data/Beijing/"
+        # data_path = '/home/zengjy/data/Beijing/'
         data = np.load(data_path + 'all.npy')
         graph = get_graph(data_path + 'graph.npy')
 
     geo_neighbors = load_geo_neighbors(graph, m_size, geo_thr)
 
-    feature_dim = m_size * 2 + 2
+    feature_dim = m_size
     embed_dim = 16
 
     spatial = spatial_attention(m_size, feature_dim, embed_dim, device)
@@ -78,8 +80,8 @@ if __name__ == '__main__':
     transferring = transferring_attention(m_size, 4 * embed_dim, 8 * embed_dim, device)
 
     gallat = gallat(device, epochs, random_seed, args.lr, batch_size, m_size, feature_dim, embed_dim, batch_no,
-                    time_slot, graph, spatial, temporal, transferring).to(device=device)
+                    time_slot, graph, data=data, start_hour=start_hour, end_hour=end_hour).to(device=device)
 
-    gallat.fit(args.dataset, data, epochs, train_day, vali_day, test_day)
+    gallat.fit(args.dataset, data, epochs, train_day, vali_day, test_day, start_hour=start_hour, end_hour=end_hour)
 
     print("Finished.")

@@ -20,7 +20,7 @@ from tqdm import trange
 class gallat(nn.Module):
 
     def __init__(self, device, epochs, random_seed, lr, batch_size, m_size, feature_dim, embed_dim, batch_no, time_slot,
-                 graph, spatial, temporal, transferring):
+                 graph, data, start_hour, end_hour):
         super(gallat, self).__init__()
 
         self.smooth_loss = nn.SmoothL1Loss()
@@ -51,40 +51,82 @@ class gallat(nn.Module):
         self.tran_Matrix = nn.Parameter(torch.FloatTensor(self.embed_dim, self.embed_dim)).to(device=device)
         init.xavier_uniform_(self.tran_Matrix)
 
-    def forward(self, features, features_1, feat_out, history_spatial_embedding, day, hour):
+        self.data = data
+        self.start_hour = start_hour
+        self.end_hour = end_hour
+        self.features = torch.eye(self.m_size, device=device)
 
-        forward_adj, forward_neighbors = load_forward_neighbors(feat_out, m_size=self.m_size)  # check
-        backward_adj, backward_neighbors = load_backward_neighbors(feat_out, m_size=self.m_size)  # check
-        geo_neighbors = load_geo_neighbors(self.graph, m_size=self.m_size, geo_thr=3)  # check
+        self.flag = torch.zeros([100, 100])
+        self.neighbor_list = [[0] * 100 for i in range(100)]
 
-        spatial_embedding = self.spatial_attention.forward(features, self.graph, forward_adj, backward_adj,
+    def get_spatial_embedding(self, day, hour):
+        feat_out = self.data[day, hour + self.start_hour]
+        # print("==========")
+        st = time.time()
+
+        if self.flag[day][hour] == 0:
+            self.flag[day][hour] = 1
+            forward_adj, forward_neighbors = load_forward_neighbors(feat_out, m_size=self.m_size)  # check
+            backward_adj, backward_neighbors = load_backward_neighbors(feat_out, m_size=self.m_size)  # check
+            geo_neighbors = load_geo_neighbors(self.graph, m_size=self.m_size, geo_thr=3)  # check
+            # print(self.neighbor_list)
+            # print(day, hour, self.neighbor_list[day])
+            self.neighbor_list[day][hour] = [forward_adj, forward_neighbors, backward_adj, backward_neighbors,
+                                             geo_neighbors]
+        else:
+            forward_adj, forward_neighbors, backward_adj, backward_neighbors, geo_neighbors = \
+                self.neighbor_list[day][hour]
+
+        # print(time.time() - st)
+        st = time.time()
+        spatial_embedding = self.spatial_attention.forward(self.features, self.graph, forward_adj, backward_adj,
                                                            geo_neighbors,
-                                                           forward_neighbors, backward_neighbors)
+                                                           forward_neighbors, backward_neighbors, day=day, hour=hour)
+        # print(time.time() - st)
+        # print("==========")
+        return spatial_embedding.reshape([1, len(spatial_embedding), -1])
 
-        history_spatial_embedding[day][hour] = spatial_embedding
-        # print(spatial_embedding)
-        s1, s2, s3, s4 = get_history_embedding(day, hour, history_spatial_embedding, 'bj', self.time_slot, self.device)
-        # print(s4)
-        mt = self.temporal_attention.forward(features_1, s1, s2, s3, s4)
+    def forward(self, day, hour):
+        st = time.time()
+        s1, s2, s3, s4 = self.get_history_embedding(day, hour, self.time_slot, self.device)
+        # print(time.time() - st)
+        st = time.time()
+        mt = self.temporal_attention.forward(self.features, s1, s2, s3, s4)
+        # print("====mt====")
         # print(mt)
+        # print(time.time() - st)
+        st = time.time()
         demand, od_matrix = self.transferring_attention.forward(mt)
+        # print(od_matrix)
+        # print(time.time() - st)
 
-        return od_matrix, demand, history_spatial_embedding
+        return od_matrix, demand
 
-    def loss(self, features, features_t1, feat_out, ground_truth, history_spatial_embeddings, day, hour):
-        od_matrix, demand, spatial_embedding = self.forward(features, features_t1, feat_out, history_spatial_embeddings,
-                                                            day, hour)
+    def loss(self, day, hour):
+        ground_truth = torch.FloatTensor(np.array(self.data[day, hour + 1 + self.start_hour]))
 
-        gt_out = torch.div(ground_truth.sum(1, keepdim=True), self.m_size)
-
+        od_matrix, demand = self.forward(day, hour)
+        demand = demand.squeeze(1)
+        gt_out = ground_truth.sum(dim=1)
+        # print(demand)
+        # print(gt_out)
         loss_d = torch.mul(
             self.smooth_loss(demand.to(device=self.device), gt_out.to(device=self.device)).to(device=self.device),
             self.wd)
         loss_o = torch.mul(self.smooth_loss(od_matrix.to(device=self.device), ground_truth.to(device=self.device)),
                            self.wo)
+        # print(od_matrix)
+        # print(ground_truth)
+        # print(loss_d)
+
+        # print("==============")
+        # print(gt_out)
+        # print(demand)
+        # print(loss_o)
+        # print("==============")
         loss = loss_d + loss_o
 
-        return loss, loss_d, loss_o, od_matrix, spatial_embedding
+        return loss, loss_d, loss_o, od_matrix, ground_truth
 
     def vali_test(self, data, start, end, halfHours, history_spatial_embeddings):
         result = []
@@ -100,8 +142,7 @@ class gallat(nn.Module):
             for m in range(30):
                 ground_truth = Variable(torch.FloatTensor(np.array(data[n, m + 1])))
 
-                od_matrix, demand, spatial_embedding = self.forward(feat_data[m], feat_data[m + 1], feat_out[m],
-                                                                    embed, n, m)
+                od_matrix, demand, spatial_embedding = self.forward(n, m)
 
                 embed = spatial_embedding
 
@@ -113,7 +154,7 @@ class gallat(nn.Module):
 
         return result, ground, history_spatial_embeddings
 
-    def fit(self, dataset, data, epochs, train_day, vali_day, test_day):
+    def fit(self, dataset, data, epochs, train_day, vali_day, test_day, start_hour, end_hour):
         optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr)
         times = []
 
@@ -135,53 +176,36 @@ class gallat(nn.Module):
             result = []
             ground = []
             start_time = time.time()
-
+            torch.autograd.set_detect_anomaly(True)
             print("###########################################################################################")
             print("Training Process: epoch=", epoch)
-            halfHours = [hour for hour in range(12, 45)]  # todo 这里后面肯定要改
-            fo.write(str(epoch) + ",")
+            halfHours = (end_hour - start_hour + 1)
+            # fo.write(str(epoch) + ",")
 
-            # loss = torch.zeros(1, device=self.device)
-            # loss_d = torch.zeros(1, device=self.device)
-            # loss_o = torch.zeros(1, device=self.device)
-            loss = torch.zeros(1, device=self.device)
-            loss_d = torch.zeros(1, device=self.device)
-            loss_o = torch.zeros(1, device=self.device)
-
-            history_spatial_embeddings = torch.FloatTensor(train_day + vali_day + test_day, self.batch_no, self.m_size,
-                                                           4 * self.embed_dim)
-            batch_range = trange((train_day - 1) * 30)
-            print("fuckkkk")
+            batch_range = trange(500, train_day * halfHours)  # todo 之前这里为啥要-1?
             for _ in batch_range:
-                n = _ // 30
-                m = _ % 30
+                n = _ // halfHours
+                m = _ % halfHours
 
-                if m == 0:
-                    feat_data, feat_out = load_OD_matrix(data, n, halfHours)
-                    feat_out = torch.FloatTensor(feat_out)
-                    feat_data = torch.FloatTensor(feat_data)
-
-                ground_truth = torch.FloatTensor(np.array(data[n, m + 1 + 12]))  # todo 这里对应的不是m
                 optimizer.zero_grad()
-                loss_one, loss_d_one, loss_o_one, od_matrix, spatial_embedding = \
-                    self.loss(feat_data[m], feat_data[m + 1], feat_out[m], ground_truth, history_spatial_embeddings,
-                              n, m)
-                history_spatial_embeddings = spatial_embedding
-                loss += loss_one
-                loss_d += loss_d_one
-                loss_o += loss_o_one
+                loss_one, loss_d_one, loss_o_one, od_matrix, ground_truth = self.loss(n, m)
+                # print(od_matrix)
+
+                loss = loss_one
+                loss_d = loss_d_one
+                loss_o = loss_o_one
+
                 result.append(od_matrix.detach().cpu().numpy())
                 ground.append(ground_truth.detach().cpu().numpy())
-                # print(od_matrix)
-                # print(ground_truth)
+
                 batch_range.set_description(f"train_loss: {loss_one};")
+                loss.backward(retain_graph=True)
+                optimizer.step()
 
             print("Loss=", loss.item(), 'Loss_d=', loss_d.item(), 'Loss_o=', loss_o.item())
-            fo.write(str(loss.item()) + ',' + str(loss_d.item()) + ',' + str(loss_o.item()) + ',')
-            loss.backward(retain_graph=True)
-            optimizer.step()
+            # fo.write(str(loss.item()) + ',' + str(loss_d.item()) + ',' + str(loss_o.item()) + ',')
 
-            fo.write("\n")
+            # fo.write("\n")
             result = np.concatenate(result, axis=0).reshape(-1, self.m_size, self.m_size)
             ground = np.concatenate(ground, axis=0).reshape(-1, self.m_size, self.m_size)
             fo.write(analysis_result(result, ground))
@@ -215,25 +239,31 @@ class gallat(nn.Module):
 
         fo.close()
 
+    def get_history_embedding(self, day, hour, time_slot, device):
+        day_len = min(day, time_slot)
+        hour_len = max(0, hour - time_slot + 1)
 
-def get_history_embedding(day, hour, history, dataset, time_slot, device):
-    day_len = min(day, time_slot)
-    hour_len = max(0, hour - time_slot + 1)
+        s1 = torch.tensor([]).to(device=device)
+        for i in range(day_len):
+            s1 = torch.cat([s1, self.get_spatial_embedding(day - i, hour + 1)])
 
-    s1 = torch.tensor([]).to(device=device)
-    for i in range(day_len):
-        s1 = torch.cat([s1, torch.tensor(history[day - i][hour + 1].unsqueeze(0), device=device)])
+        s2 = torch.tensor([]).to(device=device)
+        for i in range(day_len):
+            s2 = torch.cat([s2, self.get_spatial_embedding(day - i, hour)])
 
-    s2 = torch.tensor([]).to(device=device)
-    for i in range(day_len):
-        s2 = torch.cat([s2, torch.tensor(history[day - i][hour].unsqueeze(0), device=device)])
+        s3 = torch.tensor([]).to(device=device)
+        for i in range(day_len):
+            s3 = torch.cat([s3, self.get_spatial_embedding(day - i, hour + 2)])
 
-    s3 = torch.tensor([]).to(device=device)
-    for i in range(day_len):
-        s3 = torch.cat([s3, torch.tensor(history[day - i][hour + 2].unsqueeze(0), device=device)])
-
-    s4 = torch.tensor([]).to(device=device)
-    for i in range(hour_len, hour + 1):
-        s4 = torch.cat([s4, torch.tensor(history[day][i], device=device).unsqueeze(0)])
-
-    return s1, s2, s3, s4
+        s4 = torch.tensor([]).to(device=device)
+        for i in range(hour_len, hour + 1):
+            s4 = torch.cat([s4, self.get_spatial_embedding(day, i)])
+        # print("=====s1======")
+        # print(s1)
+        # print("=====s2======")
+        # print(s2)
+        # print("=====s3======")
+        # print(s3)
+        # print("=====s4======")
+        # print(s4)
+        return s1, s2, s3, s4

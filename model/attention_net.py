@@ -13,26 +13,36 @@ class attention_net(nn.Module):
         self.a_dim = a_dim
         self.alpha = alpha
         self.device = device
+        self.m_size = m_size
 
-        self.W = nn.Parameter(torch.zeros(size=(m_size, embed_dim, feature_dim))).to(device=device)
+        self.W = nn.Parameter(torch.zeros(size=(feature_dim, embed_dim))).to(device=device)
         nn.init.xavier_uniform_(self.W.data, gain=1.414)
-        self.a = nn.Parameter(torch.zeros(size=(a_dim, m_size))).to(device=device)  # d x N
+        self.a = nn.Parameter(torch.zeros(size=(a_dim, 1))).to(device=device)  # d x N
         nn.init.xavier_uniform_(self.a.data, gain=1.414)
         self.leakyRelu = nn.LeakyReLU(self.alpha).to(device=device)
 
     def forward(self, v_i, v_j, adj):
         # v : N x d                  n 4de
         # w : N x de x d             n 4de 4de
-        v = v_i.unsqueeze(2).to(device=self.device)
-        vv = v_j.unsqueeze(2).to(device=self.device)
-        h_i = torch.matmul(self.W, torch.tensor(v, dtype=torch.float32, device=self.device)).squeeze()  # N x de
-        h_j = torch.matmul(self.W, torch.tensor(vv, dtype=torch.float32, device=self.device)).squeeze()  # N x de
-        a_input = torch.cat([h_i, h_j], dim=1)  # N x 2de
+        # print("=============v============")
+        # print(v_i)
+        h_i = torch.mm(v_i, self.W)  # N x de
+        h_j = torch.mm(v_j, self.W)  # N x de
 
-        e = self.leakyRelu(torch.mm(self.a.T, a_input.T))  # N x N
+        a_input = torch.cat([
+            h_i.repeat(1, self.m_size).view(self.m_size * self.m_size, h_i.shape[1]),
+            h_j.repeat(self.m_size, 1)],
+            dim=1)  # N*N x 2de
+
+        # print(a_input.shape)
+
+        e = self.leakyRelu(torch.mm(a_input, self.a)).reshape(self.m_size, -1)  # N x N
+        # print("e=================")
+        # print(e)
         zero_vec = -9e15 * torch.ones_like(e)
 
-        attention = torch.where(torch.tensor(adj, device=self.device) > 0, e, zero_vec)
-        attention = F.softmax(attention, dim=0)
-
+        attention = torch.where(torch.FloatTensor(adj).to(device=self.device) > 0, e, zero_vec)
+        # print(attention)
+        attention = F.softmax(attention, dim=1)
+        # print(attention)
         return attention

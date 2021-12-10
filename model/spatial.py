@@ -29,27 +29,36 @@ class spatial_attention(nn.Module):
             torch.FloatTensor(size=(embed_dim, feature_dim))).to(device=device)
         init.xavier_uniform_(self.weight)
 
+        self.flag = torch.zeros([100, 100])
+        self.neighbor_list = [[0] * 100 for i in range(100)]
+
     def forward(self, features, geo_adj, forward_adj, backward_adj, geo_neighbors, forward_neighbors,
-                backward_neighbors):
-        t = torch.tensor(features, dtype=torch.float32, device=self.device)
-
-        mask_forward = torch.mm(
-            torch.tensor(pre_weight(forward_neighbors, self.m_size), dtype=torch.float32, device=self.device),
-            t)
-        print(mask_forward.shape)
-        mask_backward = torch.mm(
-            torch.tensor(pre_weight(backward_neighbors, self.m_size), dtype=torch.float32, device=self.device), t)
-        mask_geo = torch.mm(torch.tensor(pre_weight_geo(geo_neighbors, self.m_size), device=self.device), t)
-
+                backward_neighbors, day, hour):
+        t = features
+        if self.flag[day][hour] == 0:
+            mask_forward = torch.mm(pre_weight(forward_neighbors, self.m_size).to(self.device), t)
+            mask_backward = torch.mm(pre_weight(backward_neighbors, self.m_size).to(self.device), t)
+            mask_geo = torch.mm(pre_weight_geo(geo_neighbors, self.m_size).to(self.device), t)
+            self.flag[day][hour] = 1
+            self.neighbor_list[day][hour] = [mask_forward, mask_backward, mask_geo]
+        else:
+            mask_forward, mask_backward, mask_geo = self.neighbor_list[day][hour]
+        # print(mask_forward)
+        # print(mask_backward)
+        # print((mask_geo == 0).all())
+        # print("=======")
         weight_forward = self.attention_forward.forward(features, mask_forward, forward_adj)
         weight_backward = self.attention_backward.forward(features, mask_backward, backward_adj)
         weight_geo = self.attention_geo.forward(features, mask_geo, geo_adj)
-
+        # print(weight_forward)
+        # print(weight_backward)
+        # print("=======")
         x = torch.mm(self.weight, t.T)
 
-        zero_vec = -9e15 * torch.ones_like(t, device=self.device)
-
-        t_expand = t.clone().reshape(self.feature_dim, 1, self.m_size)
+        # zero_vec = -9e15 * torch.ones_like(t, device=self.device)
+        t_ = t
+        t_expand = t_.reshape(self.feature_dim, 1, self.m_size)
+        t_expand.to(self.device)
 
         x_forward = torch.mul(weight_forward, t_expand).sum(1)  # 不是mm
         x_forward = torch.mm(self.weight, x_forward)
@@ -59,6 +68,7 @@ class spatial_attention(nn.Module):
         x_geo = torch.mm(self.weight, x_geo)
 
         # aggregator
-        m = torch.cat([x, x_forward, x_backward, x_geo])
+
+        m = torch.cat([x_forward, x, x_geo, x_backward])  # todo 这里我改了一下顺序 为了查看变量的值
 
         return m.T
