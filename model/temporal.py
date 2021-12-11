@@ -82,7 +82,7 @@ class temporal_attention(nn.Module):
             # print(self.embed_dim)
             kq = torch.mm(query, key.T)
             # print(kq)
-            temp = torch.div(kq, 2 * math.sqrt(self.embed_dim))
+            temp = torch.div(kq, math.sqrt(self.embed_dim)) # 这里确实不需要*2
             # print(temp)
             kq = F.softmax(temp, dim=1)
             # print(kq)
@@ -110,7 +110,7 @@ def cal(features, s, wq, wk, wv, embed_dim, device):
         # print(value)
         kq = torch.mm(query, key.T)  # todo 这里应该还是 matmul
         # print(kq)
-        temp = torch.div(kq, 2 * math.sqrt(embed_dim))
+        temp = torch.div(kq, math.sqrt(embed_dim))
         # print(temp)
         gg = F.softmax(temp, dim=1)
         # print(gg)

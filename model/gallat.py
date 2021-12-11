@@ -128,31 +128,26 @@ class gallat(nn.Module):
 
         return loss, loss_d, loss_o, od_matrix, ground_truth
 
-    def vali_test(self, data, start, end, halfHours, history_spatial_embeddings):
+    def vali_test(self, data, start, end, halfHours):
         result = []
         ground = []
 
-        embed = history_spatial_embeddings
+        batch_range = trange(0, (end - start) * halfHours)  # todo 之前这里为啥要-1?
+        for _ in batch_range:
+            n = start + _ % halfHours
+            m = _ % halfHours
 
-        for n in range(start, end):
-            feat_data, feat_out = load_OD_matrix(data, n, halfHours)
-            feat_out = torch.FloatTensor(feat_out)
-            feat_data = torch.FloatTensor(feat_data)
+            ground_truth = Variable(torch.FloatTensor(np.array(data[n, start + m + 1])))
 
-            for m in range(30):
-                ground_truth = Variable(torch.FloatTensor(np.array(data[n, m + 1])))
+            od_matrix, demand = self.forward(n, m)
 
-                od_matrix, demand, spatial_embedding = self.forward(n, m)
-
-                embed = spatial_embedding
-
-                result.append(od_matrix.detach().cpu().numpy())
-                ground.append(ground_truth.detach().cpu().numpy())
+            result.append(od_matrix.detach().cpu().numpy())
+            ground.append(ground_truth.detach().cpu().numpy())
 
         result = np.concatenate(result, axis=0).reshape(-1, self.m_size, self.m_size)
         ground = np.concatenate(ground, axis=0).reshape(-1, self.m_size, self.m_size)
 
-        return result, ground, history_spatial_embeddings
+        return result, ground
 
     def fit(self, dataset, data, epochs, train_day, vali_day, test_day, start_hour, end_hour):
         optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr)
@@ -180,6 +175,7 @@ class gallat(nn.Module):
             print("###########################################################################################")
             print("Training Process: epoch=", epoch)
             halfHours = (end_hour - start_hour + 1)
+            # result_vali, ground_vali = self.vali_test(data, train_day, train_day + vali_day, halfHours)
             # fo.write(str(epoch) + ",")
 
             batch_range = trange(500, train_day * halfHours)  # todo 之前这里为啥要-1?
@@ -213,18 +209,13 @@ class gallat(nn.Module):
             torch.save(self.state_dict(), save_path + dataset + '-' + str(epoch) + "gallat.pt")
 
             #  Validation Process
-            result_vali, ground_vali, embedding = self.vali_test(data, train_day, train_day + vali_day, halfHours,
-                                                                 history_spatial_embeddings)
-
-            history_spatial_embeddings = embedding
+            result_vali, ground_vali = self.vali_test(data, train_day, train_day + vali_day, halfHours)
 
             print('Vali')
             fo.write(analysis_result(result_vali, ground_vali))
 
             # Testing Process
-            result, ground, embedding = self.vali_test(data, train_day + vali_day, train_day + vali_day + test_day,
-                                                       halfHours,
-                                                       history_spatial_embeddings)
+            result, ground = self.vali_test(data, train_day + vali_day, train_day + vali_day + test_day, halfHours)
 
             np.save(save_path + dataset + '-' + str(epoch), result)
 

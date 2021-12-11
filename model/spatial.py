@@ -20,10 +20,8 @@ class spatial_attention(nn.Module):
         self.device = device
 
         self.attention_geo = attention_net(feature_dim, embed_dim, 2 * embed_dim, 0.2, m_size, device).to(device=device)
-        self.attention_forward = attention_net(feature_dim, embed_dim, 2 * embed_dim, 0.2, m_size, device).to(
-            device=device)
-        self.attention_backward = attention_net(feature_dim, embed_dim, 2 * embed_dim, 0.2, m_size, device).to(
-            device=device)
+        self.attention_forward = self.attention_geo
+        self.attention_backward = self.attention_forward
 
         self.weight = nn.Parameter(
             torch.FloatTensor(size=(embed_dim, feature_dim))).to(device=device)

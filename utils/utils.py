@@ -63,7 +63,7 @@ def load_backward_neighbors(feat_out, m_size):
         gn_grid = {}
         for j in range(0, m_size):
             if grid_no != j and feat_out[j, grid_no] > 0:
-                graph[j, grid_no] = feat_out[j, grid_no]
+                graph[grid_no, j] = feat_out[j, grid_no]
                 gn_grid[j] = feat_out[j, grid_no]
         backward_neighbors[grid_no] = gn_grid
 

@@ -75,10 +75,6 @@ if __name__ == '__main__':
     feature_dim = m_size
     embed_dim = 16
 
-    spatial = spatial_attention(m_size, feature_dim, embed_dim, device)
-    temporal = temporal_attention(feature_dim, 4 * embed_dim, device)
-    transferring = transferring_attention(m_size, 4 * embed_dim, 8 * embed_dim, device)
-
     gallat = gallat(device, epochs, random_seed, args.lr, batch_size, m_size, feature_dim, embed_dim, batch_no,
                     time_slot, graph, data=data, start_hour=start_hour, end_hour=end_hour).to(device=device)
 
