@@ -93,7 +93,7 @@ def test_cat():
     print(t3.shape)
 
 # test_attention()
-# test_ground_truth()
-# test_cat()
-# test_temporal()
+
+test_cat()
+test_cat()
 

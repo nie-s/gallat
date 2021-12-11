@@ -2,28 +2,14 @@
 <project version="4">
   <component name="PublishConfigData" autoUpload="Always" serverName="hlz@172.17.60.30:22">
     <serverData>
-      <paths name="hlz@118.195.135.142:50100">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
       <paths name="hlz@172.17.60.30:22">
         <serverdata>
           <mappings>
-            <mapping deploy="/home/hlz/zengjy/zrx_test/gallat" local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/home/hlz/zengjy/code/gallat" local="$PROJECT_DIR$" />
           </mappings>
         </serverdata>
       </paths>
-      <paths name="lijl@175.24.63.174:50104">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="maxj@118.195.135.142:50104">
+      <paths name="xiaosy@219.224.171.201:22">
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
@@ -33,25 +19,18 @@
       <paths name="zengjy@10.2.9.3:22">
         <serverdata>
           <mappings>
-            <mapping deploy="/zrx_test/gallat" local="$PROJECT_DIR$" web="/" />
+            <mapping deploy="/code/gallat" local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
-      <paths name="zhangruixing@118.195.135.142:50105">
+      <paths name="zengjy@219.224.171.201:22">
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
           </mappings>
         </serverdata>
       </paths>
-      <paths name="zhangruixing@118.195.135.142:50105 (1)">
-        <serverdata>
-          <mappings>
-            <mapping local="$PROJECT_DIR$" web="/" />
-          </mappings>
-        </serverdata>
-      </paths>
-      <paths name="zhangruixing@219.224.165.132:22">
+      <paths name="zengjy_act">
         <serverdata>
           <mappings>
             <mapping local="$PROJECT_DIR$" web="/" />
