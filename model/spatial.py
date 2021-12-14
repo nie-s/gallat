@@ -11,7 +11,7 @@ class spatial_attention(nn.Module):
     dim_k: int
     dim_v: int
 
-    def __init__(self, m_size, feature_dim, embed_dim, device):
+    def __init__(self, m_size, feature_dim, embed_dim, device, mask_list):
         super(spatial_attention, self).__init__()
 
         self.m_size = m_size
@@ -28,19 +28,17 @@ class spatial_attention(nn.Module):
         init.xavier_uniform_(self.weight)
 
         self.flag = torch.zeros([100, 100])
-        self.neighbor_list = [[0] * 100 for i in range(100)]
+        self.mask_list = mask_list
 
     def forward(self, features, geo_adj, forward_adj, backward_adj, geo_neighbors, forward_neighbors,
                 backward_neighbors, day, hour):
         t = features
-        if self.flag[day][hour] == 0:
-            mask_forward = torch.mm(pre_weight(forward_neighbors, self.m_size).to(self.device), t)
-            mask_backward = torch.mm(pre_weight(backward_neighbors, self.m_size).to(self.device), t)
-            mask_geo = torch.mm(pre_weight_geo(geo_neighbors, self.m_size).to(self.device), t)
-            self.flag[day][hour] = 1
-            self.neighbor_list[day][hour] = [mask_forward, mask_backward, mask_geo]
-        else:
-            mask_forward, mask_backward, mask_geo = self.neighbor_list[day][hour]
+        mask_forward, mask_backward, mask_geo = self.mask_list[day][hour]
+
+        mask_forward = mask_forward.to(self.device)
+        mask_backward = mask_backward.to(self.device)
+        mask_geo = mask_geo.to(self.device)
+
         # print(mask_forward)
         # print(mask_backward)
         # print((mask_geo == 0).all())

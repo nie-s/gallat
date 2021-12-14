@@ -21,8 +21,8 @@ if __name__ == '__main__':
     parser.add_argument('--batch_size', type=int, default=2020, help='The batch size (defaults to 20)')
     parser.add_argument('--epochs', type=int, default=200, help='The number of epochs')
     parser.add_argument('--loss-weight', type=float, default=0.8, help='The value of loss_d')
-    parser.add_argument('--gpu', type=int, help='gpu to use', default=5)
-    parser.add_argument('--lr', type=float, default=0.0001, help='learning_rate')
+    parser.add_argument('--gpu', type=int, help='gpu to use', default=2)
+    parser.add_argument('--lr', type=float, default=0.001, help='learning_rate')
     parser.add_argument('--random_seed', type=int, default=0, help='random seed')
     try:
         args = parser.parse_args()
@@ -41,7 +41,7 @@ if __name__ == '__main__':
     torch.cuda.manual_seed_all(random_seed)
 
     geo_thr = 3
-    time_slot = 7
+    time_slot = 1
 
     # data path
     print('Loading data... ', end='')
@@ -69,15 +69,21 @@ if __name__ == '__main__':
         # data_path = '/home/zengjy/data/Beijing/'
         data = np.load(data_path + 'all.npy')
         graph = get_graph(data_path + 'graph.npy')
+        neighbor_list = np.load("bj1.npy", allow_pickle=True)
+        mask_list = np.load("bj2.npy", allow_pickle=True)
 
     geo_neighbors = load_geo_neighbors(graph, m_size, geo_thr)
 
     feature_dim = m_size
-    embed_dim = 16
+    embed_dim = 128
+    data_torch = torch.FloatTensor(data)
+    print("finish_put_in_torch")
 
     gallat = gallat(device, epochs, random_seed, args.lr, batch_size, m_size, feature_dim, embed_dim, batch_no,
-                    time_slot, graph, data=data, start_hour=start_hour, end_hour=end_hour).to(device=device)
+                    time_slot, graph, data=data, start_hour=start_hour, end_hour=end_hour, data_torch=data_torch,
+                    neighbor_list=neighbor_list, mask_list=mask_list).to(device=device)
 
-    gallat.fit(args.dataset, data, epochs, train_day, vali_day, test_day, start_hour=start_hour, end_hour=end_hour)
+    gallat.fit(args.dataset, data, epochs, train_day, vali_day, test_day, start_hour=start_hour, end_hour=end_hour,
+               data_torch=data_torch)
 
     print("Finished.")

@@ -20,7 +20,7 @@ from tqdm import trange
 class gallat(nn.Module):
 
     def __init__(self, device, epochs, random_seed, lr, batch_size, m_size, feature_dim, embed_dim, batch_no, time_slot,
-                 graph, data, start_hour, end_hour):
+                 graph, data, start_hour, end_hour, data_torch, neighbor_list, mask_list):
         super(gallat, self).__init__()
 
         self.smooth_loss = nn.SmoothL1Loss()
@@ -37,7 +37,8 @@ class gallat(nn.Module):
         self.epochs = epochs
         self.time_slot = time_slot
 
-        self.spatial_attention = spatial_attention(self.m_size, self.feature_dim, self.embed_dim, self.device).to(
+        self.spatial_attention = spatial_attention(self.m_size, self.feature_dim, self.embed_dim, self.device,
+                                                   mask_list).to(
             device=device)
         self.temporal_attention = temporal_attention(self.feature_dim, 4 * self.embed_dim, self.device).to(
             device=device)
@@ -52,30 +53,18 @@ class gallat(nn.Module):
         init.xavier_uniform_(self.tran_Matrix)
 
         self.data = data
+        self.data_torch = data_torch
         self.start_hour = start_hour
         self.end_hour = end_hour
         self.features = torch.eye(self.m_size, device=device)
+        self.mask_list = mask_list
 
-        self.flag = torch.zeros([100, 100])
-        self.neighbor_list = [[0] * 100 for i in range(100)]
+        self.neighbor_list = neighbor_list
 
     def get_spatial_embedding(self, day, hour):
-        feat_out = self.data[day, hour + self.start_hour]
-        # print("==========")
         st = time.time()
-
-        if self.flag[day][hour] == 0:
-            self.flag[day][hour] = 1
-            forward_adj, forward_neighbors = load_forward_neighbors(feat_out, m_size=self.m_size)  # check
-            backward_adj, backward_neighbors = load_backward_neighbors(feat_out, m_size=self.m_size)  # check
-            geo_neighbors = load_geo_neighbors(self.graph, m_size=self.m_size, geo_thr=3)  # check
-            # print(self.neighbor_list)
-            # print(day, hour, self.neighbor_list[day])
-            self.neighbor_list[day][hour] = [forward_adj, forward_neighbors, backward_adj, backward_neighbors,
-                                             geo_neighbors]
-        else:
-            forward_adj, forward_neighbors, backward_adj, backward_neighbors, geo_neighbors = \
-                self.neighbor_list[day][hour]
+        forward_adj, forward_neighbors, backward_adj, backward_neighbors, geo_neighbors = \
+            self.neighbor_list[day][hour]
 
         # print(time.time() - st)
         st = time.time()
@@ -134,10 +123,14 @@ class gallat(nn.Module):
 
         batch_range = trange(0, (end - start) * halfHours)  # todo 之前这里为啥要-1?
         for _ in batch_range:
-            n = start + _ % halfHours
+            n = (start + _) % halfHours
             m = _ % halfHours
-
-            ground_truth = Variable(torch.FloatTensor(np.array(data[n, start + m + 1])))
+            nx = n
+            ny = self.start_hour + m + 1
+            if ny == 48:
+                ny = 0
+                nx = n + 1
+            ground_truth = torch.FloatTensor(np.array(data[nx, ny]))
 
             od_matrix, demand = self.forward(n, m)
 
@@ -149,7 +142,7 @@ class gallat(nn.Module):
 
         return result, ground
 
-    def fit(self, dataset, data, epochs, train_day, vali_day, test_day, start_hour, end_hour):
+    def fit(self, dataset, data, epochs, train_day, vali_day, test_day, start_hour, end_hour, data_torch):
         optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, self.parameters()), lr=self.lr)
         times = []
 
@@ -177,7 +170,7 @@ class gallat(nn.Module):
             halfHours = (end_hour - start_hour + 1)
             # result_vali, ground_vali = self.vali_test(data, train_day, train_day + vali_day, halfHours)
             # fo.write(str(epoch) + ",")
-
+            result_vali, ground_vali = self.vali_test(data, train_day, train_day + vali_day, halfHours)
             batch_range = trange(500, train_day * halfHours)  # todo 之前这里为啥要-1?
             for _ in batch_range:
                 n = _ // halfHours
